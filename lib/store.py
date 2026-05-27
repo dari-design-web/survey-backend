@@ -1,31 +1,50 @@
-"""JSON 檔案儲存層
+"""PostgreSQL 儲存層（Neon 版）
 
-每個 entity 一個 JSON 檔，格式：
-{
-  "next_id": 1,
-  "items": [ { id, ... }, ... ]
-}
+維持原有介面（load/save/tx/insert/update/find/...），
+內部改用 PostgreSQL + JSONB 一張 key-value 表儲存。
 
-使用方式：
-  from lib.store import store
-  with store.tx("users") as users:
-      uid = store.next_id(users)
-      users["items"].append({"id": uid, "name": "X"})
-  # 離開 with 即自動寫回（atomic）
-
-  rows = store.find("users", lambda u: u["phone"] == "0912...")
+連線設定：環境變數 NEON_DATABASE_URL（優先）或 DATABASE_URL（Neon 提供）
 """
 import os
 import json
-from pathlib import Path
 from threading import RLock
 from contextlib import contextmanager
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+import psycopg2
+from psycopg2.extras import Json
+
+DATABASE_URL = (os.environ.get("NEON_DATABASE_URL") or os.environ.get("DATABASE_URL") or "").strip()
 
 _locks = {}
 _LOCK_GUARD = RLock()
+_initialized = False
+
+
+def _get_conn():
+    """每次取新連線。Neon serverless 對短查詢友善，不需 connection pool。"""
+    if not DATABASE_URL:
+        raise RuntimeError(
+            "DATABASE_URL 環境變數未設定。請在 Replit Secrets 設定 Neon 連線字串。"
+        )
+    return psycopg2.connect(DATABASE_URL, sslmode="require")
+
+
+def _ensure_init():
+    """建立 kv_store 表（idempotent）"""
+    global _initialized
+    if _initialized:
+        return
+    with _get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS kv_store (
+                    name TEXT PRIMARY KEY,
+                    data JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    updated_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            conn.commit()
+    _initialized = True
 
 
 def _lock_for(name):
@@ -35,39 +54,43 @@ def _lock_for(name):
         return _locks[name]
 
 
-def _path(name):
-    return DATA_DIR / f"{name}.json"
-
-
 def _default():
     return {"next_id": 1, "items": []}
 
 
 def load(name):
-    p = _path(name)
-    if not p.exists():
-        return _default()
-    with open(p, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    if "items" not in data:
-        data = _default()
-    data.setdefault("next_id", 1)
-    return data
+    """從 DB 讀取單一 entity 的資料（JSONB）"""
+    _ensure_init()
+    with _get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT data FROM kv_store WHERE name = %s", (name,))
+            row = cur.fetchone()
+            if row and isinstance(row[0], dict):
+                data = row[0]
+                # 確保格式合法
+                if "items" in data and isinstance(data["items"], list):
+                    data.setdefault("next_id", 1)
+                    return data
+            return _default()
 
 
 def save(name, data):
-    p = _path(name)
-    tmp = str(p) + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-        f.flush()
-        os.fsync(f.fileno())
-    os.replace(tmp, p)
+    """寫入單一 entity 的資料"""
+    _ensure_init()
+    with _get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO kv_store (name, data, updated_at)
+                VALUES (%s, %s, NOW())
+                ON CONFLICT (name) DO UPDATE
+                SET data = EXCLUDED.data, updated_at = NOW()
+            """, (name, Json(data)))
+            conn.commit()
 
 
 @contextmanager
 def tx(name):
-    """讀-改-寫的原子交易"""
+    """讀-改-寫的原子交易（thread-safe）"""
     lock = _lock_for(name)
     with lock:
         data = load(name)
