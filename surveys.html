@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>問卷管理</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../config.js"></script>
+<script src="../js/common.js"></script>
+<script src="../js/api.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>body{font-family:'Noto Sans TC',sans-serif}</style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+<script>renderAdminHeader('surveys');</script>
+<main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+  <div class="flex items-center justify-between mb-5">
+    <h1 class="text-2xl font-bold">問卷管理</h1>
+    <a href="survey-edit.html" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-bold">+ 新增問卷</a>
+  </div>
+  <div class="bg-white rounded-xl border overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-50 text-xs uppercase text-slate-500">
+        <tr><th class="px-4 py-3 text-left">ID</th><th class="px-4 py-3 text-left">問卷名稱</th>
+        <th class="px-4 py-3 text-left">場域</th><th class="px-4 py-3 text-center">題數</th>
+        <th class="px-4 py-3 text-center">填寫數</th><th class="px-4 py-3 text-center">狀態</th>
+        <th class="px-4 py-3 text-center">操作</th></tr>
+      </thead>
+      <tbody id="tb" class="divide-y divide-slate-100"></tbody>
+    </table>
+  </div>
+</main>
+<script>
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]))}
+async function load() {
+  const { surveys } = await API.get('/api/admin/surveys');
+  document.getElementById('tb').innerHTML = surveys.length ? surveys.map(s => `
+    <tr class="hover:bg-slate-50">
+      <td class="px-4 py-3 text-slate-500">${s.id}</td>
+      <td class="px-4 py-3 font-medium">${esc(s.title)}</td>
+      <td class="px-4 py-3 text-slate-600">${esc(s.location_name) || '—'}</td>
+      <td class="px-4 py-3 text-center">${s.question_count}</td>
+      <td class="px-4 py-3 text-center">${s.response_count}</td>
+      <td class="px-4 py-3 text-center">
+        ${s.is_active ? '<span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded">啟用</span>'
+                      : '<span class="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded">停用</span>'}
+      </td>
+      <td class="px-4 py-3 text-center text-xs">
+        <a href="survey-edit.html?id=${s.id}" class="text-brand-600 hover:underline">編輯</a>
+        <span class="text-slate-300 mx-1">|</span>
+        <button onclick="toggleA(${s.id})" class="text-amber-600 hover:underline">${s.is_active ? '停用' : '啟用'}</button>
+        <span class="text-slate-300 mx-1">|</span>
+        <button onclick="dup(${s.id})" class="text-slate-600 hover:underline">複製</button>
+      </td>
+    </tr>`).join('') : '<tr><td colspan="7" class="px-4 py-10 text-center text-slate-400">尚無問卷</td></tr>';
+}
+async function toggleA(id) { await API.post('/api/admin/surveys/' + id + '/toggle-active'); load(); }
+async function dup(id) {
+  if (!confirm('確定要複製此問卷嗎？')) return;
+  const r = await API.post('/api/admin/surveys/' + id + '/duplicate');
+  if (r.ok) location.href = 'survey-edit.html?id=' + r.id;
+}
+load();
+</script>
+</body>
+</html>
