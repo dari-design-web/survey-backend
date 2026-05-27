@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>編輯問卷</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../config.js"></script>
+<script src="../js/common.js"></script>
+<script src="../js/api.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>body{font-family:'Noto Sans TC',sans-serif}</style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+<script>renderAdminHeader('surveys');</script>
+<main class="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+  <h1 id="title" class="text-2xl font-bold mb-5">新增問卷</h1>
+
+  <div class="bg-white rounded-xl border p-5 mb-5">
+    <h2 class="font-bold mb-3 text-slate-700">基本設定</h2>
+    <div class="grid md:grid-cols-2 gap-4 text-sm">
+      <label class="block"><span class="text-slate-700">問卷名稱 <span class="text-red-500">*</span></span>
+        <input id="f_title" class="mt-1 w-full border rounded px-3 py-2"></label>
+      <label class="block"><span class="text-slate-700">場域名稱</span>
+        <input id="f_location" class="mt-1 w-full border rounded px-3 py-2"></label>
+      <label class="block md:col-span-2"><span class="text-slate-700">問卷說明</span>
+        <textarea id="f_desc" rows="2" class="mt-1 w-full border rounded px-3 py-2"></textarea></label>
+      <label class="block"><span class="text-slate-700">開始日期</span>
+        <input id="f_start" type="date" class="mt-1 w-full border rounded px-3 py-2"></label>
+      <label class="block"><span class="text-slate-700">結束日期</span>
+        <input id="f_end" type="date" class="mt-1 w-full border rounded px-3 py-2"></label>
+      <label class="flex items-center gap-2"><input id="f_active" type="checkbox" checked class="rounded">啟用問卷</label>
+      <label class="flex items-center gap-2"><input id="f_genCoupon" type="checkbox" checked class="rounded">完成後產生兌換券</label>
+      <label class="block"><span class="text-slate-700">兌換券有效天數</span>
+        <input id="f_validDays" type="number" min="1" value="30" class="mt-1 w-full border rounded px-3 py-2"></label>
+      <label class="block"><span class="text-slate-700">兌換間隔（天）</span>
+        <input id="f_interval" type="number" min="0" value="30" class="mt-1 w-full border rounded px-3 py-2"></label>
+      <label class="block md:col-span-2"><span class="text-slate-700">兌換地點說明</span>
+        <input id="f_redLoc" class="mt-1 w-full border rounded px-3 py-2"></label>
+      <label class="block"><span class="text-slate-700">兌換券標題</span>
+        <input id="f_ctitle" value="贈品兌換券" class="mt-1 w-full border rounded px-3 py-2"></label>
+      <label class="block"><span class="text-slate-700">兌換券副標</span>
+        <input id="f_csub" value="感謝您完成滿意度調查" class="mt-1 w-full border rounded px-3 py-2"></label>
+    </div>
+    <div class="mt-4 flex gap-2">
+      <button id="saveBtn" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded font-bold text-sm">建立問卷</button>
+      <a href="surveys.html" class="px-4 py-2 text-sm text-slate-600">取消</a>
+    </div>
+    <p id="msg" class="mt-2 text-sm"></p>
+  </div>
+
+  <div id="qsec" class="bg-white rounded-xl border p-5 hidden">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="font-bold text-slate-700">題目清單</h2>
+      <button onclick="addQ()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-sm font-bold">+ 新增題目</button>
+    </div>
+    <div id="qList" class="space-y-3"></div>
+  </div>
+</main>
+
+<script>
+let sid = Number(new URLSearchParams(location.search).get('id')) || null;
+const msg = document.getElementById('msg');
+
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]))}
+
+function readForm() {
+  return {
+    title: f_title.value.trim(), location_name: f_location.value.trim(),
+    description: f_desc.value, start_date: f_start.value || null, end_date: f_end.value || null,
+    is_active: f_active.checked, generate_coupon: f_genCoupon.checked,
+    coupon_valid_days: +f_validDays.value, redemption_interval_days: +f_interval.value,
+    redemption_location: f_redLoc.value.trim(),
+    coupon_title: f_ctitle.value.trim(), coupon_subtitle: f_csub.value.trim()
+  };
+}
+
+document.getElementById('saveBtn').addEventListener('click', async () => {
+  const body = readForm();
+  if (!body.title) { msg.textContent = '請填寫問卷名稱'; msg.className = 'text-red-600 mt-2 text-sm'; return; }
+  try {
+    const r = sid ? await API.put('/api/admin/surveys/' + sid, body)
+                  : await API.post('/api/admin/surveys', body);
+    if (!sid && r.id) location.href = '?id=' + r.id;
+    else { msg.textContent = '已儲存 ✓'; msg.className = 'text-green-600 mt-2 text-sm'; }
+  } catch (e) { msg.textContent = '儲存失敗：' + e.message; msg.className = 'text-red-600 mt-2 text-sm'; }
+});
+
+async function load() {
+  if (!sid) return;
+  document.getElementById('title').textContent = '編輯問卷';
+  document.getElementById('saveBtn').textContent = '儲存設定';
+  const { survey, questions } = await API.get('/api/admin/surveys/' + sid);
+  f_title.value = survey.title || '';
+  f_location.value = survey.location_name || '';
+  f_desc.value = survey.description || '';
+  f_start.value = survey.start_date || '';
+  f_end.value = survey.end_date || '';
+  f_active.checked = !!survey.is_active;
+  f_genCoupon.checked = !!survey.generate_coupon;
+  f_validDays.value = survey.coupon_valid_days || 30;
+  f_interval.value = survey.redemption_interval_days ?? 30;
+  f_redLoc.value = survey.redemption_location || '';
+  f_ctitle.value = survey.coupon_title || '贈品兌換券';
+  f_csub.value = survey.coupon_subtitle || '感謝您完成滿意度調查';
+  document.getElementById('qsec').classList.remove('hidden');
+  renderQs(questions);
+}
+
+function renderQs(qs) {
+  const list = document.getElementById('qList');
+  if (!qs.length) { list.innerHTML = '<div class="text-center text-slate-400 py-8 border border-dashed rounded-lg">尚無題目</div>'; return; }
+  list.innerHTML = qs.map(q => {
+    let opts = [];
+    try { opts = q.options ? JSON.parse(q.options) : []; } catch(_) {}
+    return `<div class="border rounded-lg p-4" data-qid="${q.id}">
+      <div class="grid md:grid-cols-12 gap-3 text-sm">
+        <div class="md:col-span-2"><label class="text-xs text-slate-500">題型</label>
+          <select data-f="type" class="w-full border rounded px-2 py-1.5">
+            ${[['single','單選題'],['multiple','複選題'],['rating','1-5 評分'],['text','短文字'],['textarea','長文字'],['select','下拉選單']]
+              .map(([v,l]) => `<option value="${v}" ${q.question_type===v?'selected':''}>${l}</option>`).join('')}
+          </select></div>
+        <div class="md:col-span-8"><label class="text-xs text-slate-500">題目</label>
+          <input data-f="text" value="${esc(q.question_text)}" class="w-full border rounded px-2 py-1.5"></div>
+        <div class="md:col-span-2"><label class="text-xs text-slate-500">順序</label>
+          <input type="number" data-f="order" value="${q.sort_order}" class="w-full border rounded px-2 py-1.5"></div>
+      </div>
+      <div class="mt-3"><label class="text-xs text-slate-500">選項（每行一個）</label>
+        <textarea data-f="options" rows="3" class="w-full border rounded px-2 py-1.5 font-mono text-xs">${esc(opts.join('\n'))}</textarea></div>
+      <div class="mt-3 flex flex-wrap gap-4 text-xs">
+        <label class="flex items-center gap-1"><input type="checkbox" data-f="required" ${q.is_required?'checked':''}>必填</label>
+        <label class="flex items-center gap-1"><input type="checkbox" data-f="stat" ${q.include_in_statistics?'checked':''}>納入統計</label>
+        <label class="flex items-center gap-1"><input type="checkbox" data-f="sat" ${q.is_satisfaction_score?'checked':''}>滿意度評分題</label>
+        <label class="flex items-center gap-1"><input type="checkbox" data-f="overall" ${q.is_overall_score?'checked':''}>整體滿意度</label>
+        <div class="ml-auto flex items-center gap-3"><span data-msg class="text-xs"></span>
+          <button onclick="saveQ(${q.id})" class="bg-brand-600 hover:bg-brand-700 text-white px-3 py-1 rounded text-xs font-bold">儲存</button>
+          <button onclick="delQ(${q.id})" class="text-red-600 hover:underline text-xs">刪除</button>
+        </div>
+      </div></div>`;
+  }).join('');
+}
+
+async function addQ() {
+  await API.post('/api/admin/surveys/' + sid + '/questions',
+    { question_text:'新題目', question_type:'single', is_required:true, options:['選項1','選項2'], sort_order:999 });
+  reloadQs();
+}
+
+async function saveQ(qid) {
+  const root = document.querySelector(`[data-qid="${qid}"]`);
+  const type = root.querySelector('[data-f="type"]').value;
+  const opts = root.querySelector('[data-f="options"]').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  const body = {
+    question_text: root.querySelector('[data-f="text"]').value,
+    question_type: type, is_required: root.querySelector('[data-f="required"]').checked,
+    options: ['single','multiple','select'].includes(type) ? opts : null,
+    sort_order: +root.querySelector('[data-f="order"]').value || 0,
+    is_active: true,
+    include_in_statistics: root.querySelector('[data-f="stat"]').checked,
+    is_satisfaction_score: root.querySelector('[data-f="sat"]').checked,
+    is_overall_score: root.querySelector('[data-f="overall"]').checked
+  };
+  try {
+    await API.put('/api/admin/questions/' + qid, body);
+    const m = root.querySelector('[data-msg]'); m.textContent='已儲存 ✓'; m.className='text-green-600 text-xs';
+    setTimeout(()=>m.textContent='',2000);
+  } catch (e) { alert('儲存失敗：' + e.message); }
+}
+
+async function delQ(qid) {
+  if (!confirm('確定刪除此題？')) return;
+  await API.del('/api/admin/questions/' + qid);
+  reloadQs();
+}
+
+async function reloadQs() {
+  const { questions } = await API.get('/api/admin/surveys/' + sid);
+  renderQs(questions);
+}
+
+load();
+</script>
+</body>
+</html>

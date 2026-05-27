@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>兌換券核銷</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../config.js"></script>
+<script src="../js/common.js"></script>
+<script src="../js/api.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>body{font-family:'Noto Sans TC',sans-serif} input{font-size:16px!important}</style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+<script>renderAdminHeader('redeem');</script>
+<main class="max-w-md mx-auto px-4 py-6">
+  <h1 class="text-2xl font-bold mb-4">兌換券核銷</h1>
+  <div class="bg-white rounded-xl border p-5 mb-4">
+    <label class="block text-sm font-medium mb-2">兌換券編號</label>
+    <div class="flex gap-2">
+      <input id="code" type="text" placeholder="GIFT-YYYYMMDD-NNNN" class="flex-1 border border-slate-300 rounded-lg px-3 py-3 font-mono">
+      <button id="lookupBtn" class="bg-slate-600 hover:bg-slate-700 text-white px-4 rounded-lg text-sm font-bold">查詢</button>
+    </div>
+    <button id="scanBtn" class="mt-4 w-full bg-brand-100 text-brand-700 hover:bg-brand-200 py-2 rounded-lg text-sm font-bold">📷 開啟相機掃描 QR Code</button>
+    <video id="video" class="hidden w-full mt-3 rounded-lg border" playsinline></video>
+  </div>
+  <div id="result"></div>
+</main>
+<script>
+const code = document.getElementById('code');
+const result = document.getElementById('result');
+const video = document.getElementById('video');
+let stream = null, scanning = false;
+
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]))}
+
+// 自動帶入 URL 內的 ?code=
+const initCode = new URLSearchParams(location.search).get('code');
+if (initCode) { code.value = initCode; lookup(initCode); }
+
+async function lookup(c) {
+  result.innerHTML = '<div class="text-center py-6 text-slate-500">查詢中…</div>';
+  try {
+    const d = await API.get('/api/redeem/lookup?code=' + encodeURIComponent(c));
+    render(d, c);
+  } catch (e) { result.innerHTML = `<div class="bg-red-50 border border-red-200 text-red-700 rounded-xl p-5">${esc(e.message)}</div>`; }
+}
+
+function render(d, c) {
+  if (!d.ok) { result.innerHTML = `<div class="bg-red-50 border border-red-200 text-red-700 rounded-xl p-5"><div class="font-bold text-lg">❌ ${esc(d.message)}</div></div>`; return; }
+  const co = d.coupon;
+  const sm = { issued:['可兌換','green',true], redeemed:['已使用','slate',false],
+               expired:['已逾期','red',false], voided:['已作廢','red',false] };
+  const [lab, col, canRedeem] = sm[co.status] || [co.status, 'slate', false];
+  const u = co.user || {};
+  result.innerHTML = `
+    <div class="bg-white border rounded-xl p-5">
+      <div class="text-center mb-4">
+        <div class="text-3xl mb-1">${canRedeem ? '✅' : (co.status === 'redeemed' ? '⚠️' : '❌')}</div>
+        <div class="text-xl font-bold text-${col}-700">${esc(lab)}</div>
+        <div class="font-mono text-sm text-slate-500 mt-1">${esc(co.code)}</div>
+      </div>
+      <div class="text-sm space-y-1 border-t pt-3">
+        <div class="flex justify-between"><span class="text-slate-500">問卷</span><span>${esc(co.survey_title || '—')}</span></div>
+        <div class="flex justify-between"><span class="text-slate-500">使用者</span><span>${esc(u.name || '匿名')}</span></div>
+        <div class="flex justify-between"><span class="text-slate-500">手機/Email</span><span>${esc(u.phone || u.email || '—')}</span></div>
+        <div class="flex justify-between"><span class="text-slate-500">產生</span><span>${esc((co.issued_at||'').slice(0,19).replace('T',' '))}</span></div>
+        <div class="flex justify-between"><span class="text-slate-500">期限</span><span>${esc((co.expires_at||'').slice(0,19).replace('T',' '))}</span></div>
+        ${co.redeemed_at ? `<div class="flex justify-between"><span class="text-slate-500">已核銷於</span><span>${esc(co.redeemed_at.slice(0,19).replace('T',' '))}</span></div>` : ''}
+        ${co.lastRedeemedBeforeThis ? `<div class="text-xs text-slate-500">使用者最近一次兌換：${esc(co.lastRedeemedBeforeThis.slice(0,19).replace('T',' '))}</div>` : ''}
+      </div>
+      ${canRedeem ? `<button id="confirmBtn" class="mt-4 w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 rounded-xl text-lg">確認核銷</button>` : ''}
+    </div>`;
+  const btn = document.getElementById('confirmBtn');
+  if (btn) btn.onclick = () => doRedeem(c);
+}
+
+async function doRedeem(c) {
+  const btn = document.getElementById('confirmBtn');
+  btn.disabled = true; btn.textContent = '核銷中…';
+  try {
+    const r = await API.post('/api/redeem', { code: c });
+    if (r.ok) {
+      result.innerHTML = `<div class="bg-green-50 border border-green-200 text-green-700 rounded-xl p-6 text-center">
+        <div class="text-5xl mb-2">✅</div><div class="text-xl font-bold">${esc(r.message)}</div>
+        <div class="font-mono mt-2 text-sm">${esc(r.coupon.coupon_code)}</div>
+        <div class="text-xs text-slate-500 mt-1">核銷時間：${esc((r.coupon.redeemed_at||'').slice(0,19).replace('T',' '))}</div>
+      </div>`;
+    } else {
+      result.innerHTML = `<div class="bg-red-50 border border-red-200 text-red-700 rounded-xl p-6 text-center">
+        <div class="text-4xl mb-2">❌</div><div class="font-bold">${esc(r.message)}</div></div>`;
+    }
+  } catch (e) { alert('核銷失敗：' + e.message); btn.disabled = false; btn.textContent = '確認核銷'; }
+}
+
+document.getElementById('lookupBtn').addEventListener('click', () => { const c = code.value.trim(); if (c) lookup(c); });
+code.addEventListener('keypress', e => { if (e.key === 'Enter') document.getElementById('lookupBtn').click(); });
+
+document.getElementById('scanBtn').addEventListener('click', async () => {
+  if (scanning) { stopScan(); return; }
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    video.srcObject = stream; video.classList.remove('hidden'); await video.play();
+    scanning = true; document.getElementById('scanBtn').textContent = '⏹ 停止掃描';
+    loopScan();
+  } catch (e) { alert('無法開啟相機：' + e.message); }
+});
+
+function stopScan() {
+  scanning = false;
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  video.classList.add('hidden');
+  document.getElementById('scanBtn').textContent = '📷 開啟相機掃描 QR Code';
+}
+
+function loopScan() {
+  if (!scanning) return;
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const qr = jsQR(img.data, img.width, img.height);
+  if (qr && qr.data) {
+    // QR 內容可能是 GIFT-... 或完整 URL；嘗試取出 code
+    let c = qr.data.trim();
+    const m = c.match(/code=([A-Z0-9-]+)/i);
+    if (m) c = m[1];
+    code.value = c; stopScan(); lookup(c); return;
+  }
+  requestAnimationFrame(loopScan);
+}
+</script>
+</body>
+</html>

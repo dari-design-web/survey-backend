@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>送出完成</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="config.js"></script>
+<script src="js/common.js"></script>
+<script src="js/api.js"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>body{font-family:'Noto Sans TC',sans-serif}</style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+<main class="max-w-md mx-auto px-5 py-8 min-h-screen" id="root">
+  <div class="text-center py-12 text-slate-400">載入中…</div>
+</main>
+
+<script>
+const q = new URLSearchParams(location.search);
+const code = q.get('code');
+const reason = q.get('reason');
+const nextDate = q.get('nextDate');
+const root = document.getElementById('root');
+
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]))}
+
+(async () => {
+  if (code) {
+    try {
+      const { coupon, survey } = await API.get('/api/public/coupons/' + encodeURIComponent(code));
+      renderCoupon(coupon, survey);
+    } catch (e) {
+      root.innerHTML = `<div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4">無法載入兌換券：${esc(e.message)}</div>`;
+    }
+  } else if (reason === 'interval_not_met') {
+    root.innerHTML = `
+      <div class="text-center mb-6">
+        <div class="inline-flex w-16 h-16 rounded-full bg-amber-100 items-center justify-center mb-3">⚠️</div>
+        <h1 class="text-2xl font-bold">問卷已送出</h1>
+        <p class="text-sm text-slate-500 mt-1">感謝您的回饋</p>
+      </div>
+      <div class="bg-white border border-amber-200 rounded-xl p-6 text-center">
+        <p class="text-slate-700">您已於一個月內兌換過贈品</p>
+        ${nextDate ? `<p class="mt-2 text-lg font-bold text-amber-600">下次可兌換日期：${esc(nextDate)}</p>` : ''}
+      </div>
+      <a href="index.html" class="mt-6 block text-center text-sm text-slate-500">返回首頁</a>`;
+  } else {
+    root.innerHTML = `
+      <div class="text-center">
+        <div class="inline-flex w-16 h-16 rounded-full bg-green-100 items-center justify-center mb-3">✅</div>
+        <h1 class="text-2xl font-bold">問卷已送出</h1>
+        <p class="text-sm text-slate-500 mt-3">感謝您的寶貴意見！</p>
+      </div>
+      <a href="index.html" class="mt-6 block text-center text-sm text-slate-500">返回首頁</a>`;
+  }
+})();
+
+function renderCoupon(coupon, survey) {
+  root.innerHTML = `
+    <div class="text-center mb-6">
+      <div class="inline-flex w-16 h-16 rounded-full bg-green-100 items-center justify-center mb-3">✅</div>
+      <h1 class="text-2xl font-bold">感謝您的回饋！</h1>
+      <p class="text-sm text-slate-500 mt-1">問卷已送出，以下為您的電子兌換券</p>
+    </div>
+    <div class="bg-white border-2 border-dashed border-brand-400 rounded-2xl p-6 shadow-lg">
+      <div class="text-center">
+        <div class="inline-block bg-brand-600 text-white px-3 py-1 rounded text-xs font-bold mb-3">
+          ${esc(survey?.coupon_title || '贈品兌換券')}
+        </div>
+        <div class="text-xs text-slate-500">${esc(survey?.coupon_subtitle || '感謝您完成滿意度調查')}</div>
+        <div id="qrBox" class="my-6 inline-block p-3 bg-white rounded-lg border-2 border-slate-900"></div>
+        <div class="text-lg font-mono font-bold text-brand-700 tracking-wider">${esc(coupon.coupon_code)}</div>
+        <div class="mt-4 text-left text-sm space-y-2 border-t pt-4">
+          <div class="flex justify-between"><span class="text-slate-500">產生時間</span><span>${esc(coupon.issued_at?.slice(0,19).replace('T',' '))}</span></div>
+          <div class="flex justify-between"><span class="text-slate-500">有效期限</span><span>${esc(coupon.expires_at?.slice(0,19).replace('T',' '))}</span></div>
+          ${survey?.redemption_location ? `<div class="flex justify-between"><span class="text-slate-500">兌換地點</span><span>${esc(survey.redemption_location)}</span></div>` : ''}
+          <div class="flex justify-between"><span class="text-slate-500">狀態</span><span class="font-bold text-green-600">未兌換</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="mt-5 bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+      <p class="font-medium mb-2">使用說明</p>
+      <ul class="list-disc list-inside space-y-1 text-amber-700">
+        <li>請於兌換期限內至兌換地點，向工作人員出示本 QR Code 兌換贈品。</li>
+        <li>每張兌換券限使用一次，截圖重複使用無效。</li>
+      </ul>
+    </div>
+    <a href="coupon.html?code=${encodeURIComponent(coupon.coupon_code)}" class="mt-5 block w-full text-center bg-white border-2 border-brand-600 text-brand-700 font-bold py-3 rounded-xl">查看兌換券專屬頁面</a>
+    <a href="index.html" class="mt-3 block text-center text-sm text-slate-500">返回首頁</a>`;
+  const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=' + encodeURIComponent(coupon.qr_code_value || coupon.coupon_code);
+  document.getElementById('qrBox').innerHTML = '<img src="' + qrUrl + '" alt="QR Code" width="240" height="240">';
+}
+</script>
+</body>
+</html>

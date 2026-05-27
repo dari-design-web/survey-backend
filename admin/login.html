@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理者登入</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../config.js"></script>
+<script src="../js/common.js"></script>
+<script src="../js/api.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>body{font-family:'Noto Sans TC',sans-serif}</style>
+</head>
+<body class="bg-slate-50 min-h-screen flex items-center justify-center px-4">
+<div class="max-w-sm w-full">
+  <div class="text-center mb-6">
+    <div class="inline-flex w-14 h-14 rounded-xl bg-brand-600 text-white text-2xl items-center justify-center mb-3">📋</div>
+    <h1 class="text-2xl font-bold">滿意度管理系統</h1>
+    <p class="text-sm text-slate-500 mt-1">後台管理登入</p>
+  </div>
+  <form id="f" class="bg-white rounded-xl shadow border border-slate-200 p-6">
+    <div id="err" class="hidden bg-red-50 border border-red-200 text-red-700 rounded p-3 mb-4 text-sm"></div>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Email</label>
+        <input type="email" id="e" required class="w-full border border-slate-300 rounded-lg px-3 py-2.5">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">密碼</label>
+        <input type="password" id="p" required class="w-full border border-slate-300 rounded-lg px-3 py-2.5">
+      </div>
+      <button type="submit" id="btn" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-2.5 rounded-lg">登入</button>
+    </div>
+  </form>
+  <p class="text-center mt-4 text-xs text-slate-400">
+    預設超管：admin@example.com / Admin@123456<br>
+    預設現場：staff@example.com / Staff@123456
+  </p>
+  <p class="text-center mt-2 text-xs text-slate-400">
+    後端：<code id="api"></code>
+  </p>
+</div>
+<script>
+document.getElementById('api').textContent = window.API_BASE;
+document.getElementById('f').addEventListener('submit', async e => {
+  e.preventDefault();
+  const err = document.getElementById('err');
+  const btn = document.getElementById('btn');
+  err.classList.add('hidden');
+  btn.disabled = true; btn.textContent = '登入中…';
+  try {
+    const r = await API.post('/api/auth/login', {
+      email: document.getElementById('e').value.trim(),
+      password: document.getElementById('p').value
+    });
+    API.setToken(r.token);
+    location.href = r.user.role === 'staff' ? 'redeem.html' : 'dashboard.html';
+  } catch (e2) {
+    err.textContent = e2.message;
+    err.classList.remove('hidden');
+    btn.disabled = false; btn.textContent = '登入';
+  }
+});
+</script>
+</body>
+</html>

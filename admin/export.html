@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>資料匯出</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../config.js"></script>
+<script src="../js/common.js"></script>
+<script src="../js/api.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>body{font-family:'Noto Sans TC',sans-serif}</style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+<script>renderAdminHeader('export');</script>
+<main class="max-w-3xl mx-auto px-4 sm:px-6 py-6">
+  <h1 class="text-2xl font-bold mb-5">資料匯出</h1>
+
+  <div class="bg-white rounded-xl border p-5 mb-5">
+    <h2 class="font-bold mb-3">📋 問卷填答資料</h2>
+    <form id="f1" class="grid md:grid-cols-3 gap-3 text-sm">
+      <select name="survey_id" id="surveyOpts" class="border rounded px-3 py-2"><option value="">所有問卷</option></select>
+      <input name="date_from" type="date" class="border rounded px-3 py-2">
+      <input name="date_to" type="date" class="border rounded px-3 py-2">
+      <button type="button" onclick="dl('responses', 'f1')" class="md:col-span-3 bg-brand-600 hover:bg-brand-700 text-white rounded px-4 py-2 font-bold">⬇ 下載 Excel</button>
+    </form>
+  </div>
+
+  <div class="bg-white rounded-xl border p-5 mb-5">
+    <h2 class="font-bold mb-3">🎟 兌換券資料</h2>
+    <form id="f2" class="grid md:grid-cols-3 gap-3 text-sm">
+      <select name="status" class="border rounded px-3 py-2">
+        <option value="">所有狀態</option>
+        <option value="issued">未兌換</option><option value="redeemed">已兌換</option>
+        <option value="expired">已逾期</option><option value="voided">已作廢</option>
+      </select>
+      <input name="date_from" type="date" class="border rounded px-3 py-2">
+      <input name="date_to" type="date" class="border rounded px-3 py-2">
+      <button type="button" onclick="dl('coupons', 'f2')" class="md:col-span-3 bg-brand-600 hover:bg-brand-700 text-white rounded px-4 py-2 font-bold">⬇ 下載 Excel</button>
+    </form>
+  </div>
+
+  <div class="bg-white rounded-xl border p-5">
+    <h2 class="font-bold mb-3">📊 統計摘要</h2>
+    <p class="text-sm text-slate-600 mb-3">含總數、平均滿意度、關鍵字統計三個工作表。</p>
+    <button onclick="dl('summary')" class="bg-brand-600 hover:bg-brand-700 text-white rounded px-5 py-2 font-bold text-sm">⬇ 下載統計摘要</button>
+  </div>
+</main>
+<script>
+(async () => {
+  const { surveys } = await API.get('/api/admin/surveys');
+  document.getElementById('surveyOpts').innerHTML = '<option value="">所有問卷</option>' +
+    surveys.map(s => `<option value="${s.id}">${s.title.replace(/"/g, '')}</option>`).join('');
+})();
+
+function dl(kind, formId) {
+  const q = new URLSearchParams();
+  if (formId) {
+    new FormData(document.getElementById(formId)).forEach((v, k) => { if (v) q.set(k, v); });
+  }
+  const url = API.downloadUrl('/api/admin/export/' + kind + (q.toString() ? '?' + q.toString() : ''));
+  // 用 fetch 取得 blob 再下載，避免 SPA 阻擋
+  fetch(url).then(r => r.blob()).then(blob => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = kind + '_' + Date.now() + '.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }).catch(e => alert('下載失敗：' + e.message));
+}
+</script>
+</body>
+</html>

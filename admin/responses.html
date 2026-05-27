@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>問卷填答資料</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../config.js"></script>
+<script src="../js/common.js"></script>
+<script src="../js/api.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>body{font-family:'Noto Sans TC',sans-serif}</style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+<script>renderAdminHeader('responses');</script>
+<main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+  <div class="flex items-center justify-between mb-5">
+    <h1 class="text-2xl font-bold">問卷填答資料</h1>
+    <a href="export.html" class="text-sm text-brand-600 hover:underline">→ 匯出 Excel</a>
+  </div>
+  <form id="filter" class="bg-white rounded-xl border p-4 mb-5 grid md:grid-cols-5 gap-3 text-sm">
+    <select id="survey_id" class="border rounded px-2 py-2"><option value="">所有問卷</option></select>
+    <input id="date_from" type="date" class="border rounded px-2 py-2">
+    <input id="date_to" type="date" class="border rounded px-2 py-2">
+    <div class="flex gap-2">
+      <input id="min_score" type="number" min="1" max="5" placeholder="最低分" class="border rounded px-2 py-2 w-full">
+      <input id="max_score" type="number" min="1" max="5" placeholder="最高分" class="border rounded px-2 py-2 w-full">
+    </div>
+    <button class="bg-brand-600 text-white rounded px-4 py-2 font-bold">查詢</button>
+  </form>
+  <div class="bg-white rounded-xl border overflow-x-auto">
+    <table class="w-full text-sm min-w-[800px]">
+      <thead class="bg-slate-50 text-xs uppercase text-slate-500">
+        <tr><th class="px-4 py-3 text-left">ID</th><th class="px-4 py-3 text-left">填寫時間</th>
+        <th class="px-4 py-3 text-left">問卷</th><th class="px-4 py-3 text-left">使用者</th>
+        <th class="px-4 py-3 text-center">整體滿意</th><th class="px-4 py-3 text-left">兌換券</th>
+        <th class="px-4 py-3 text-center">操作</th></tr>
+      </thead>
+      <tbody id="tb" class="divide-y divide-slate-100"></tbody>
+    </table>
+  </div>
+  <p class="text-xs text-slate-400 mt-3">顯示前 500 筆。</p>
+</main>
+<script>
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]))}
+const sm = {issued:'未兌換',redeemed:'已兌換',expired:'已逾期',voided:'已作廢'};
+
+async function init() {
+  const { surveys } = await API.get('/api/admin/surveys');
+  document.getElementById('survey_id').innerHTML = '<option value="">所有問卷</option>' +
+    surveys.map(s => `<option value="${s.id}">${esc(s.title)}</option>`).join('');
+  load();
+}
+async function load() {
+  const q = new URLSearchParams();
+  ['survey_id','date_from','date_to','min_score','max_score'].forEach(k => {
+    const v = document.getElementById(k).value;
+    if (v) q.set(k, v);
+  });
+  const { rows } = await API.get('/api/admin/responses?' + q.toString());
+  document.getElementById('tb').innerHTML = rows.length ? rows.map(r => {
+    const sc = r.overall_score;
+    const scoreClass = sc >= 4 ? 'text-green-600' : sc <= 2 ? 'text-red-600' : 'text-amber-600';
+    return `<tr class="hover:bg-slate-50">
+      <td class="px-4 py-3 text-slate-500">${r.id}</td>
+      <td class="px-4 py-3 text-xs">${esc(r.submitted_at?.slice(0,19).replace('T',' '))}</td>
+      <td class="px-4 py-3">${esc(r.survey_title)}</td>
+      <td class="px-4 py-3 text-xs">${esc(r.user_name || '')}<br><span class="text-slate-500">${esc(r.phone || r.email || '—')}</span></td>
+      <td class="px-4 py-3 text-center font-bold ${sc != null ? scoreClass : ''}">${sc != null ? sc : '—'}</td>
+      <td class="px-4 py-3 text-xs font-mono">${esc(r.coupon_code || '—')} ${r.coupon_status ? `<span class="text-slate-500">(${sm[r.coupon_status] || r.coupon_status})</span>` : ''}</td>
+      <td class="px-4 py-3 text-center text-xs"><button onclick="detail(${r.id})" class="text-brand-600 hover:underline">查看</button></td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="7" class="px-4 py-10 text-center text-slate-400">查無資料</td></tr>';
+}
+document.getElementById('filter').addEventListener('submit', e => { e.preventDefault(); load(); });
+
+async function detail(rid) {
+  const { response, answers, coupon } = await API.get('/api/admin/responses/' + rid);
+  const html = `
+    <h3 class="font-bold mb-2 text-base">填答 #${response.id}</h3>
+    <div class="text-xs text-slate-600 mb-3">
+      問卷：${esc(response.survey_title)}　場域：${esc(response.location_name || '—')}<br>
+      時間：${esc(response.submitted_at?.slice(0,19).replace('T',' '))}
+      識別：${esc(response.phone || response.email || '匿名')}
+    </div>
+    <div class="space-y-2 max-h-96 overflow-y-auto">${answers.map(a => `
+      <div class="border-b pb-2 text-sm">
+        <div class="text-slate-500 text-xs">${a.sort_order}. ${esc(a.question_text)} (${a.question_type})</div>
+        <div class="text-brand-700">${
+          a.question_type === 'rating' ? '⭐ ' + (a.answer_value != null ? a.answer_value + ' / 5' : '—') :
+          a.question_type === 'multiple' ? (() => { try { return JSON.parse(a.answer_text||'[]').join('、'); } catch(_) { return esc(a.answer_text); }})() :
+          esc(a.answer_text || '—')
+        }</div>
+      </div>`).join('')}</div>
+    ${coupon ? `<div class="mt-3 pt-3 border-t text-sm"><b>兌換券：</b>${esc(coupon.coupon_code)} (${coupon.status})</div>` : ''}`;
+  showModal(html);
+}
+
+function showModal(html) {
+  let m = document.getElementById('modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'modal';
+    m.className = 'fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4';
+    m.innerHTML = '<div class="bg-white rounded-xl max-w-lg w-full p-5 max-h-[90vh] overflow-auto"><div id="modalBody"></div><button onclick="document.getElementById(\'modal\').remove()" class="mt-4 w-full bg-slate-100 hover:bg-slate-200 py-2 rounded text-sm">關閉</button></div>';
+    document.body.appendChild(m);
+  }
+  document.getElementById('modalBody').innerHTML = html;
+}
+init();
+</script>
+</body>
+</html>

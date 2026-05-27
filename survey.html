@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>填寫問卷</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="config.js"></script>
+<script src="js/common.js"></script>
+<script src="js/api.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>body{font-family:'Noto Sans TC',sans-serif} input,textarea,select{font-size:16px!important}</style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+<main class="max-w-md mx-auto px-5 py-6 min-h-screen pb-32">
+  <a href="index.html" class="inline-flex items-center text-sm text-slate-500 mb-4">
+    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+    </svg>返回
+  </a>
+  <div id="root">
+    <div class="text-center py-12 text-slate-400">載入中…</div>
+  </div>
+</main>
+
+<script>
+const surveyId = Number(new URLSearchParams(location.search).get('id'));
+const root = document.getElementById('root');
+let questions = [];
+const DEVICE_KEY = 'survey_device_id';
+
+function escapeHtml(s){return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]))}
+
+function getDeviceId() {
+  let d = localStorage.getItem(DEVICE_KEY);
+  if (!d) {
+    d = (crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '') :
+         Array(32).fill(0).map(()=>Math.floor(Math.random()*16).toString(16)).join(''));
+    localStorage.setItem(DEVICE_KEY, d);
+  }
+  return d;
+}
+
+function renderQuestion(q, idx) {
+  let inner = '';
+  const ratingLabels = ['非常不滿','不滿意','普通','滿意','非常滿意'];
+  let opts = [];
+  try { opts = q.options ? JSON.parse(q.options) : []; } catch(_) {}
+
+  if (q.question_type === 'single') {
+    inner = `<div class="space-y-2">${opts.map(o => `
+      <label class="flex items-center gap-3 px-4 py-3 border border-slate-200 rounded-lg cursor-pointer has-[:checked]:bg-brand-50 has-[:checked]:border-brand-500">
+        <input type="radio" name="q_${q.id}" value="${escapeHtml(o)}" ${q.is_required?'required':''} class="text-brand-600 focus:ring-brand-500">
+        <span class="text-sm">${escapeHtml(o)}</span>
+      </label>`).join('')}</div>`;
+  } else if (q.question_type === 'multiple') {
+    inner = `<div class="space-y-2">${opts.map(o => `
+      <label class="flex items-center gap-3 px-4 py-3 border border-slate-200 rounded-lg cursor-pointer has-[:checked]:bg-brand-50 has-[:checked]:border-brand-500">
+        <input type="checkbox" name="q_${q.id}" value="${escapeHtml(o)}" class="text-brand-600 rounded focus:ring-brand-500">
+        <span class="text-sm">${escapeHtml(o)}</span>
+      </label>`).join('')}</div>`;
+  } else if (q.question_type === 'rating') {
+    inner = `<div class="flex justify-between gap-1">${[1,2,3,4,5].map(n => `
+      <label class="flex-1">
+        <input type="radio" name="q_${q.id}" value="${n}" ${q.is_required?'required':''} class="peer hidden">
+        <div class="border border-slate-200 rounded-lg py-3 text-center cursor-pointer peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600 transition">
+          <div class="text-xl font-bold">${n}</div>
+          <div class="text-xs mt-0.5">${ratingLabels[n-1]}</div>
+        </div>
+      </label>`).join('')}</div>`;
+  } else if (q.question_type === 'select') {
+    inner = `<select name="q_${q.id}" ${q.is_required?'required':''} class="w-full border border-slate-300 rounded-lg px-3 py-3">
+      <option value="">請選擇</option>
+      ${opts.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('')}
+    </select>`;
+  } else if (q.question_type === 'textarea') {
+    inner = `<textarea name="q_${q.id}" rows="4" ${q.is_required?'required':''} placeholder="請輸入您的意見..." class="w-full border border-slate-300 rounded-lg px-3 py-3"></textarea>`;
+  } else {
+    inner = `<input type="text" name="q_${q.id}" ${q.is_required?'required':''} class="w-full border border-slate-300 rounded-lg px-3 py-3">`;
+  }
+
+  return `<div class="bg-white border border-slate-200 rounded-xl p-5">
+    <div class="text-sm font-semibold text-slate-900 mb-3">
+      ${idx+1}. ${escapeHtml(q.question_text)}${q.is_required?'<span class="text-red-500">*</span>':''}
+    </div>
+    ${inner}
+  </div>`;
+}
+
+(async () => {
+  if (!surveyId) { root.innerHTML = '<div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4">缺少 ?id= 參數</div>'; return; }
+  try {
+    const { survey, questions: qs } = await API.get('/api/public/surveys/' + surveyId);
+    questions = qs;
+    root.innerHTML = `
+      <div class="mb-6">
+        <h1 class="text-xl font-bold text-slate-900">${escapeHtml(survey.title)}</h1>
+        ${survey.location_name ? `<p class="text-xs text-slate-500 mt-1">📍 ${escapeHtml(survey.location_name)}</p>` : ''}
+        ${survey.description ? `<p class="text-sm text-slate-600 mt-3 leading-relaxed">${escapeHtml(survey.description)}</p>` : ''}
+      </div>
+      <form id="f" class="space-y-5">
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-sm text-emerald-800">
+          <p class="font-medium mb-1">✨ 匿名填寫，免登入</p>
+          <p class="text-xs text-emerald-700">您的回饋完全匿名，系統不會收集個資。完成後即可獲得電子贈品兌換券。</p>
+        </div>
+        ${questions.map((q, i) => renderQuestion(q, i)).join('')}
+        <div id="msg" class="hidden bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm"></div>
+      </form>
+      <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-3 shadow-lg">
+        <div class="max-w-md mx-auto">
+          <button id="submitBtn" form="f" type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-4 rounded-xl shadow active:scale-[0.98] transition">送出問卷</button>
+        </div>
+      </div>`;
+    document.getElementById('f').addEventListener('submit', submit);
+  } catch (e) {
+    root.innerHTML = `<div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4">無法載入問卷：${escapeHtml(e.message)}</div>`;
+  }
+})();
+
+async function submit(e) {
+  e.preventDefault();
+  const f = document.getElementById('f');
+  const msg = document.getElementById('msg');
+  const btn = document.getElementById('submitBtn');
+  msg.classList.add('hidden');
+  btn.disabled = true; btn.textContent = '送出中…';
+
+  const fd = new FormData(f);
+  const answers = questions.map(q => q.question_type === 'multiple'
+    ? { questionId: q.id, value: fd.getAll('q_' + q.id) }
+    : { questionId: q.id, value: fd.get('q_' + q.id) || '' });
+
+  try {
+    const r = await API.post('/api/public/survey', { surveyId, answers, deviceId: getDeviceId() });
+    // 儲存 deviceId（後端可能回新的）
+    if (r.deviceId) localStorage.setItem(DEVICE_KEY, r.deviceId);
+
+    const q = new URLSearchParams();
+    if (r.coupon) q.set('code', r.coupon.code);
+    if (r.reason) q.set('reason', r.reason);
+    if (r.nextDate) q.set('nextDate', r.nextDate.slice(0, 10));
+    location.href = 'success.html?' + q.toString();
+  } catch (e2) {
+    msg.textContent = e2.message;
+    msg.classList.remove('hidden');
+    btn.disabled = false; btn.textContent = '送出問卷';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+</script>
+</body>
+</html>

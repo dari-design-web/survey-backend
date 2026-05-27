@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>兌換券管理</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../config.js"></script>
+<script src="../js/common.js"></script>
+<script src="../js/api.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>body{font-family:'Noto Sans TC',sans-serif}</style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+<script>renderAdminHeader('coupons');</script>
+<main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+  <div class="flex items-center justify-between mb-5">
+    <h1 class="text-2xl font-bold">兌換券管理</h1>
+    <a href="export.html" class="text-sm text-brand-600 hover:underline">→ 匯出 Excel</a>
+  </div>
+  <form id="filter" class="bg-white rounded-xl border p-4 mb-5 grid md:grid-cols-5 gap-3 text-sm">
+    <input id="search" placeholder="券號／手機／Email" class="border rounded px-3 py-2">
+    <select id="status" class="border rounded px-2 py-2">
+      <option value="">所有狀態</option>
+      <option value="issued">未兌換</option><option value="redeemed">已兌換</option>
+      <option value="expired">已逾期</option><option value="voided">已作廢</option>
+    </select>
+    <input id="date_from" type="date" class="border rounded px-2 py-2">
+    <input id="date_to" type="date" class="border rounded px-2 py-2">
+    <button class="bg-brand-600 text-white rounded px-4 py-2 font-bold">查詢</button>
+  </form>
+  <div class="bg-white rounded-xl border overflow-x-auto">
+    <table class="w-full text-sm min-w-[800px]">
+      <thead class="bg-slate-50 text-xs uppercase text-slate-500">
+        <tr><th class="px-4 py-3 text-left">編號</th><th class="px-4 py-3 text-left">使用者</th>
+        <th class="px-4 py-3 text-left">問卷</th><th class="px-4 py-3 text-left">產生</th>
+        <th class="px-4 py-3 text-left">期限</th><th class="px-4 py-3 text-center">狀態</th>
+        <th class="px-4 py-3 text-left">核銷</th><th class="px-4 py-3 text-center">操作</th></tr>
+      </thead>
+      <tbody id="tb" class="divide-y divide-slate-100"></tbody>
+    </table>
+  </div>
+</main>
+<script>
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]))}
+const sm = {issued:['未兌換','green'],redeemed:['已兌換','slate'],expired:['已逾期','red'],voided:['已作廢','red']};
+
+async function load() {
+  const q = new URLSearchParams();
+  ['status','search','date_from','date_to'].forEach(k => { const v = document.getElementById(k).value; if (v) q.set(k, v); });
+  const { rows } = await API.get('/api/admin/coupons?' + q.toString());
+  document.getElementById('tb').innerHTML = rows.length ? rows.map(r => {
+    const [lab, col] = sm[r.status] || [r.status, 'slate'];
+    return `<tr class="hover:bg-slate-50">
+      <td class="px-4 py-3 font-mono text-xs"><a href="../coupon.html?code=${encodeURIComponent(r.coupon_code)}" target="_blank" class="text-brand-600 hover:underline">${esc(r.coupon_code)}</a></td>
+      <td class="px-4 py-3 text-xs">${esc(r.user_name || '匿名')}<br><span class="text-slate-500">${esc(r.phone || r.email || '—')}</span></td>
+      <td class="px-4 py-3">${esc(r.survey_title || '—')}</td>
+      <td class="px-4 py-3 text-xs">${esc((r.issued_at||'').slice(0,19).replace('T',' '))}</td>
+      <td class="px-4 py-3 text-xs">${esc((r.expires_at||'').slice(0,19).replace('T',' '))}</td>
+      <td class="px-4 py-3 text-center text-xs"><span class="bg-${col}-100 text-${col}-700 px-2 py-0.5 rounded">${lab}</span></td>
+      <td class="px-4 py-3 text-xs">${r.redeemed_at ? esc(r.redeemed_at.slice(0,19).replace('T',' ')) + '<br><span class="text-slate-500">by ' + esc(r.redeemer_name || '—') + '</span>' : '—'}</td>
+      <td class="px-4 py-3 text-center text-xs">
+        ${r.status === 'issued' ? `<button onclick="voidC(${r.id})" class="text-red-600 hover:underline">作廢</button>` : '—'}
+      </td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="8" class="px-4 py-10 text-center text-slate-400">查無資料</td></tr>';
+}
+document.getElementById('filter').addEventListener('submit', e => { e.preventDefault(); load(); });
+
+async function voidC(id) {
+  const note = prompt('請輸入作廢原因（可留空）：');
+  if (note === null) return;
+  const r = await API.post('/api/admin/coupons/' + id + '/void', { note });
+  alert(r.message || '完成');
+  if (r.ok) load();
+}
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理者帳號</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../config.js"></script>
+<script src="../js/common.js"></script>
+<script src="../js/api.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>body{font-family:'Noto Sans TC',sans-serif}</style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+<script>renderAdminHeader('users');</script>
+<main class="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+  <h1 class="text-2xl font-bold mb-5">管理者帳號管理</h1>
+  <div class="bg-white rounded-xl border p-5 mb-5">
+    <h2 class="font-bold mb-3">新增管理者</h2>
+    <div class="grid md:grid-cols-5 gap-3 text-sm">
+      <input id="n_name" placeholder="姓名" class="border rounded px-3 py-2">
+      <input id="n_email" type="email" placeholder="Email" class="border rounded px-3 py-2">
+      <input id="n_password" type="password" placeholder="密碼（至少 8 字）" class="border rounded px-3 py-2">
+      <select id="n_role" class="border rounded px-3 py-2">
+        <option value="admin">一般管理者</option>
+        <option value="super">超級管理者</option>
+        <option value="staff">現場工作人員</option>
+      </select>
+      <button onclick="addUser()" class="bg-brand-600 hover:bg-brand-700 text-white rounded px-4 py-2 font-bold">新增</button>
+    </div>
+    <p class="text-xs text-slate-500 mt-2">super=所有功能含帳號；admin=問卷與資料；staff=僅核銷。</p>
+  </div>
+  <div class="bg-white rounded-xl border overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-50 text-xs uppercase text-slate-500">
+        <tr><th class="px-4 py-3 text-left">ID</th><th class="px-4 py-3 text-left">姓名</th>
+        <th class="px-4 py-3 text-left">Email</th><th class="px-4 py-3 text-center">角色</th>
+        <th class="px-4 py-3 text-center">啟用</th><th class="px-4 py-3 text-left">最近登入</th>
+        <th class="px-4 py-3 text-center">操作</th></tr>
+      </thead>
+      <tbody id="tb" class="divide-y divide-slate-100"></tbody>
+    </table>
+  </div>
+</main>
+<script>
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]))}
+async function load() {
+  const { users } = await API.get('/api/admin/admin-users');
+  document.getElementById('tb').innerHTML = users.map(u => `
+    <tr class="hover:bg-slate-50">
+      <td class="px-4 py-3 text-slate-500">${u.id}</td>
+      <td class="px-4 py-3 font-medium">${esc(u.name)}</td>
+      <td class="px-4 py-3 text-xs">${esc(u.email)}</td>
+      <td class="px-4 py-3 text-center text-xs">${esc(u.role)}</td>
+      <td class="px-4 py-3 text-center">${u.is_active ? '✓' : '—'}</td>
+      <td class="px-4 py-3 text-xs">${esc(u.last_login_at ? u.last_login_at.slice(0,19).replace('T',' ') : '—')}</td>
+      <td class="px-4 py-3 text-center text-xs">
+        <button onclick="resetPw(${u.id}, ${JSON.stringify(u.name).replace(/"/g,'&quot;')}, '${u.role}', ${!!u.is_active})" class="text-amber-600 hover:underline">重設密碼</button>
+        <span class="text-slate-300 mx-1">|</span>
+        <button onclick="toggleA(${u.id}, ${JSON.stringify(u.name).replace(/"/g,'&quot;')}, '${u.role}', ${!!u.is_active})" class="text-slate-600 hover:underline">${u.is_active ? '停用' : '啟用'}</button>
+      </td>
+    </tr>`).join('');
+}
+async function addUser() {
+  const body = { name: n_name.value.trim(), email: n_email.value.trim(),
+                 password: n_password.value, role: n_role.value };
+  if (!body.name || !body.email || !body.password) return alert('請填寫完整資料');
+  try { await API.post('/api/admin/admin-users', body); location.reload(); }
+  catch (e) { alert(e.message); }
+}
+async function resetPw(id, name, role, active) {
+  const password = prompt('請輸入新密碼（至少 8 字）：');
+  if (!password || password.length < 8) return alert('密碼至少 8 字');
+  await API.put('/api/admin/admin-users/' + id, { name, role, is_active: active, password });
+  alert('已重設');
+}
+async function toggleA(id, name, role, active) {
+  await API.put('/api/admin/admin-users/' + id, { name, role, is_active: !active });
+  load();
+}
+load();
+</script>
+</body>
+</html>
