@@ -224,6 +224,14 @@ function collectValue(q) {
     return el.value;
   }
 
+  // rating / nps：radio 群組，必須用 :checked 選擇器
+  // 否則 querySelector 會永遠回傳第一個 radio 的 value（rating=5、nps=0）
+  if (q.question_type === 'rating' || q.question_type === 'nps') {
+    const el = f.querySelector(`input[name="q_${q.id}"]:checked`);
+    return el ? el.value : '';
+  }
+
+  // textarea / text / phone / select：單一輸入元素
   const el = f.querySelector(`[name="q_${q.id}"]`);
   return el ? el.value : '';
 }
@@ -243,8 +251,17 @@ async function submit(e) {
     const r = await API.post('/api/public/survey', { surveyId, answers, deviceId: getDeviceId() });
     if (r.deviceId) localStorage.setItem(DEVICE_KEY, r.deviceId);
 
+    // 把完整 coupon + survey 暫存到 sessionStorage，success.html 直接讀
+    // 可省掉 success.html 再打一次 API 的延遲
+    if (r.coupon && r.survey) {
+      try {
+        sessionStorage.setItem('coupon_cache_' + (r.coupon.coupon_code || r.coupon.code || ''),
+          JSON.stringify({ coupon: r.coupon, survey: r.survey, t: Date.now() }));
+      } catch(_) {}
+    }
+
     const qs = new URLSearchParams();
-    if (r.coupon) qs.set('code', r.coupon.code);
+    if (r.coupon) qs.set('code', r.coupon.coupon_code || r.coupon.code);
     if (r.reason) qs.set('reason', r.reason);
     if (r.nextDate) qs.set('nextDate', r.nextDate.slice(0, 10));
     location.href = 'success.html?' + qs.toString();
