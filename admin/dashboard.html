@@ -55,7 +55,11 @@
         <div id="couponTable" class="text-xs"></div>
       </div>
     </div>
-    <div class="bg-white rounded-xl border p-4"><h3 class="text-sm font-bold mb-3">開放式意見類別</h3><canvas id="kwChart" height="160"></canvas></div>
+    <div class="bg-white rounded-xl border p-4">
+      <h3 class="text-sm font-bold mb-1">每月民眾意見數量</h3>
+      <p class="text-[11px] text-slate-500 mb-2">統計「最滿意 / 最需改善」等開放式題目的填答數量</p>
+      <canvas id="kwChart" height="160"></canvas>
+    </div>
   </div>
 
   <!-- 最新民眾意見原文 -->
@@ -269,7 +273,28 @@ function showEmpty(canvasId, msg, boxId){
     .filter(r => (r.c || 0) > 0)
     .map(r => ({ label: cmap[r.label] || r.label, c: r.c }));
   pieWithTable('couponChart', 'couponTable', 'couponBox', couponItems);
-  colBar('kwChart', data.keywords.map(r => r.label), data.keywords.map(r => r.c), '#EC4899');
+  // 每月民眾意見數量（用月份做 X 軸，含整數刻度）
+  const mc = data.monthlyComments || [];
+  const mcLabels = mc.map(r => r.m);
+  const mcValues = mc.map(r => r.c);
+  if (mcValues.every(v => v === 0)) {
+    showEmpty('kwChart', '尚無民眾意見');
+  } else {
+    new Chart(document.getElementById('kwChart'), {
+      type: 'bar',
+      data: { labels: mcLabels, datasets: [{ data: mcValues, backgroundColor: '#EC4899', borderRadius: 4 }] },
+      options: {
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: c => c.parsed.y + ' 則' } }
+        },
+        scales: {
+          y: { beginAtZero: true, ticks: { precision: 0, stepSize: 1 } }
+        }
+      }
+    });
+  }
+
   renderComments(data.recentComments || []);
 })();
 
