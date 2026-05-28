@@ -55,10 +55,10 @@ async function load() {
       <td class="px-4 py-3 font-mono text-xs"><a href="../coupon.html?code=${encodeURIComponent(r.coupon_code)}" target="_blank" class="text-brand-600 hover:underline">${esc(r.coupon_code)}</a></td>
       <td class="px-4 py-3 text-xs">${esc(r.user_name || '匿名')}<br><span class="text-slate-500">${esc(r.phone || r.email || '—')}</span></td>
       <td class="px-4 py-3">${esc(r.survey_title || '—')}</td>
-      <td class="px-4 py-3 text-xs">${esc((r.issued_at||'').slice(0,19).replace('T',' '))}</td>
-      <td class="px-4 py-3 text-xs">${esc((r.expires_at||'').slice(0,19).replace('T',' '))}</td>
+      <td class="px-4 py-3 text-xs">${esc(fmtTpe(r.issued_at))}</td>
+      <td class="px-4 py-3 text-xs">${esc(fmtTpe(r.expires_at))}</td>
       <td class="px-4 py-3 text-center text-xs"><span class="bg-${col}-100 text-${col}-700 px-2 py-0.5 rounded">${lab}</span></td>
-      <td class="px-4 py-3 text-xs">${r.redeemed_at ? esc(r.redeemed_at.slice(0,19).replace('T',' ')) + '<br><span class="text-slate-500">by ' + esc(r.redeemer_name || '—') + '</span>' : '—'}</td>
+      <td class="px-4 py-3 text-xs">${r.redeemed_at ? esc(fmtTpe(r.redeemed_at)) + '<br><span class="text-slate-500">by ' + esc(r.redeemer_name || '—') + '</span>' : '—'}</td>
       <td class="px-4 py-3 text-center text-xs">
         ${r.status === 'issued' ? `<button onclick="voidC(${r.id})" class="text-red-600 hover:underline">作廢</button>` : '—'}
       </td>

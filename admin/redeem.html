@@ -65,10 +65,10 @@ function render(d, c) {
         <div class="flex justify-between"><span class="text-slate-500">問卷</span><span>${esc(co.survey_title || '—')}</span></div>
         <div class="flex justify-between"><span class="text-slate-500">使用者</span><span>${esc(u.name || '匿名')}</span></div>
         <div class="flex justify-between"><span class="text-slate-500">手機/Email</span><span>${esc(u.phone || u.email || '—')}</span></div>
-        <div class="flex justify-between"><span class="text-slate-500">產生</span><span>${esc((co.issued_at||'').slice(0,19).replace('T',' '))}</span></div>
-        <div class="flex justify-between"><span class="text-slate-500">期限</span><span>${esc((co.expires_at||'').slice(0,19).replace('T',' '))}</span></div>
-        ${co.redeemed_at ? `<div class="flex justify-between"><span class="text-slate-500">已核銷於</span><span>${esc(co.redeemed_at.slice(0,19).replace('T',' '))}</span></div>` : ''}
-        ${co.lastRedeemedBeforeThis ? `<div class="text-xs text-slate-500">使用者最近一次兌換：${esc(co.lastRedeemedBeforeThis.slice(0,19).replace('T',' '))}</div>` : ''}
+        <div class="flex justify-between"><span class="text-slate-500">產生</span><span>${esc(fmtTpe(co.issued_at))}</span></div>
+        <div class="flex justify-between"><span class="text-slate-500">期限</span><span>${esc(fmtTpe(co.expires_at))}</span></div>
+        ${co.redeemed_at ? `<div class="flex justify-between"><span class="text-slate-500">已核銷於</span><span>${esc(fmtTpe(co.redeemed_at))}</span></div>` : ''}
+        ${co.lastRedeemedBeforeThis ? `<div class="text-xs text-slate-500">使用者最近一次兌換：${esc(fmtTpe(co.lastRedeemedBeforeThis))}</div>` : ''}
       </div>
       ${canRedeem ? `<button id="confirmBtn" class="mt-4 w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 rounded-xl text-lg">確認核銷</button>` : ''}
     </div>`;
@@ -85,7 +85,7 @@ async function doRedeem(c) {
       result.innerHTML = `<div class="bg-green-50 border border-green-200 text-green-700 rounded-xl p-6 text-center">
         <div class="text-5xl mb-2">✅</div><div class="text-xl font-bold">${esc(r.message)}</div>
         <div class="font-mono mt-2 text-sm">${esc(r.coupon.coupon_code)}</div>
-        <div class="text-xs text-slate-500 mt-1">核銷時間：${esc((r.coupon.redeemed_at||'').slice(0,19).replace('T',' '))}</div>
+        <div class="text-xs text-slate-500 mt-1">核銷時間：${esc(fmtTpe(r.coupon.redeemed_at))}</div>
       </div>`;
     } else {
       result.innerHTML = `<div class="bg-red-50 border border-red-200 text-red-700 rounded-xl p-6 text-center">

@@ -366,7 +366,7 @@ function renderComments(items) {
     return;
   }
   box.innerHTML = items.map(item => {
-    const date = (item.submitted_at || '').slice(0, 16).replace('T', ' ');
+    const date = fmtTpe(item.submitted_at, 'short');
     return `
       <div class="border-l-4 border-brand-400 bg-slate-50 px-4 py-3 rounded-r-lg">
         <div class="flex justify-between items-start gap-2 mb-1">

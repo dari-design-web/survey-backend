@@ -53,7 +53,7 @@ async function load() {
       <td class="px-4 py-3 text-xs">${esc(u.email)}</td>
       <td class="px-4 py-3 text-center text-xs">${esc(u.role)}</td>
       <td class="px-4 py-3 text-center">${u.is_active ? '✓' : '—'}</td>
-      <td class="px-4 py-3 text-xs">${esc(u.last_login_at ? u.last_login_at.slice(0,19).replace('T',' ') : '—')}</td>
+      <td class="px-4 py-3 text-xs">${esc(fmtTpe(u.last_login_at))}</td>
       <td class="px-4 py-3 text-center text-xs">
         <button onclick="resetPw(${u.id}, ${JSON.stringify(u.name).replace(/"/g,'&quot;')}, '${u.role}', ${!!u.is_active})" class="text-amber-600 hover:underline">重設密碼</button>
         <span class="text-slate-300 mx-1">|</span>
