@@ -21,20 +21,58 @@
   <div class="grid md:grid-cols-2 gap-5">
     <div class="bg-white rounded-xl border p-4"><h3 class="text-sm font-bold mb-3">每日填寫趨勢（近 30 天）</h3><canvas id="dailyChart" height="120"></canvas></div>
     <div class="bg-white rounded-xl border p-4"><h3 class="text-sm font-bold mb-3">每月填寫趨勢（近 12 個月）</h3><canvas id="monthlyChart" height="120"></canvas></div>
-    <div class="bg-white rounded-xl border p-4"><h3 class="text-sm font-bold mb-3">各項滿意度平均</h3><canvas id="satChart" height="160"></canvas></div>
+    <div class="bg-white rounded-xl border p-4"><h3 class="text-sm font-bold mb-3">各項滿意度平均</h3><canvas id="satChart" height="180"></canvas></div>
     <div class="bg-white rounded-xl border p-4"><h3 class="text-sm font-bold mb-3">整體滿意度分布</h3><canvas id="distChart" height="160"></canvas></div>
-    <div class="bg-white rounded-xl border p-4"><h3 class="text-sm font-bold mb-3">來訪目的比例</h3><canvas id="purposeChart" height="160"></canvas></div>
-    <div class="bg-white rounded-xl border p-4"><h3 class="text-sm font-bold mb-3">主要使用服務比例</h3><canvas id="serviceChart" height="160"></canvas></div>
+    <div class="bg-white rounded-xl border p-4">
+      <h3 class="text-sm font-bold mb-3">民眾身分別分布</h3>
+      <div id="purposeBox" class="relative" style="min-height:200px"><canvas id="purposeChart" height="160"></canvas></div>
+    </div>
+    <div class="bg-white rounded-xl border p-4">
+      <h3 class="text-sm font-bold mb-3">使用服務類型分布</h3>
+      <div id="serviceBox" class="relative" style="min-height:200px"><canvas id="serviceChart" height="160"></canvas></div>
+    </div>
     <div class="bg-white rounded-xl border p-4"><h3 class="text-sm font-bold mb-3">兌換券狀態</h3><canvas id="couponChart" height="160"></canvas></div>
     <div class="bg-white rounded-xl border p-4"><h3 class="text-sm font-bold mb-3">開放式意見類別</h3><canvas id="kwChart" height="160"></canvas></div>
+  </div>
+
+  <!-- 最新民眾意見原文 -->
+  <div class="bg-white rounded-xl border p-4 mt-5">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-sm font-bold">最新民眾意見原文（近 30 筆）</h3>
+      <a href="responses.html" class="text-xs text-brand-600 hover:underline">查看全部填答 →</a>
+    </div>
+    <div id="commentsList" class="space-y-3">
+      <div class="text-center py-8 text-slate-400 text-sm">載入中…</div>
+    </div>
   </div>
 </main>
 <script>
 const COLORS = ['#2563EB','#10B981','#F59E0B','#EF4444','#8B5CF6','#06B6D4','#EC4899','#14B8A6','#F97316'];
-function lineChart(id, labels, values, label){ new Chart(document.getElementById(id),{type:'line',data:{labels,datasets:[{label,data:values,borderColor:'#2563EB',backgroundColor:'rgba(37,99,235,.1)',tension:.3,fill:true}]},options:{plugins:{legend:{display:false}}}}); }
-function barChart(id, labels, values){ new Chart(document.getElementById(id),{type:'bar',data:{labels,datasets:[{data:values,backgroundColor:'#2563EB'}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,max:5}}}}); }
-function pieChart(id, labels, values){ new Chart(document.getElementById(id),{type:'doughnut',data:{labels,datasets:[{data:values,backgroundColor:COLORS}]},options:{plugins:{legend:{position:'right'}}}}); }
-function colBar(id, labels, values, color){ new Chart(document.getElementById(id),{type:'bar',data:{labels,datasets:[{data:values,backgroundColor:color||'#10B981'}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}}); }
+
+function lineChart(id, labels, values, label){
+  if (!values.length) { showEmpty(id, '尚無資料'); return; }
+  new Chart(document.getElementById(id),{type:'line',data:{labels,datasets:[{label,data:values,borderColor:'#2563EB',backgroundColor:'rgba(37,99,235,.1)',tension:.3,fill:true}]},options:{plugins:{legend:{display:false}}}});
+}
+function barChart(id, labels, values){
+  if (!values.length) { showEmpty(id, '尚無資料'); return; }
+  new Chart(document.getElementById(id),{type:'bar',data:{labels,datasets:[{data:values,backgroundColor:'#2563EB'}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,max:5}}}});
+}
+function pieChart(id, labels, values, boxId){
+  if (!values.length) { showEmpty(id, '尚無資料', boxId); return; }
+  new Chart(document.getElementById(id),{type:'doughnut',data:{labels,datasets:[{data:values,backgroundColor:COLORS}]},options:{plugins:{legend:{position:'right'}}}});
+}
+function colBar(id, labels, values, color){
+  if (!values.length) { showEmpty(id, '尚無資料'); return; }
+  new Chart(document.getElementById(id),{type:'bar',data:{labels,datasets:[{data:values,backgroundColor:color||'#10B981'}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+}
+function showEmpty(canvasId, msg, boxId){
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const parent = boxId ? document.getElementById(boxId) : canvas.parentElement;
+  if (parent) {
+    parent.innerHTML = `<div class="flex items-center justify-center h-40 text-slate-400 text-sm">${msg}</div>`;
+  }
+}
 
 (async () => {
   const data = await API.get('/api/admin/dashboard');
@@ -58,12 +96,35 @@ function colBar(id, labels, values, color){ new Chart(document.getElementById(id
   lineChart('monthlyChart', data.monthlyTrend.map(r => r.m), data.monthlyTrend.map(r => r.c), '每月');
   barChart('satChart', data.satisfactionAvg.map(r => r.label), data.satisfactionAvg.map(r => r.avg || 0));
   colBar('distChart', data.overallDist.map(r => r.score + '分'), data.overallDist.map(r => r.c), '#8B5CF6');
-  pieChart('purposeChart', data.purposeDist.map(r => r.label), data.purposeDist.map(r => r.c));
-  pieChart('serviceChart', data.serviceDist.map(r => r.label), data.serviceDist.map(r => r.c));
+  pieChart('purposeChart', data.purposeDist.map(r => r.label), data.purposeDist.map(r => r.c), 'purposeBox');
+  pieChart('serviceChart', data.serviceDist.map(r => r.label), data.serviceDist.map(r => r.c), 'serviceBox');
   const cmap = {issued:'未兌換',redeemed:'已兌換',expired:'已逾期',voided:'已作廢',invalid:'無效'};
   pieChart('couponChart', data.couponStatus.map(r => cmap[r.label] || r.label), data.couponStatus.map(r => r.c));
   colBar('kwChart', data.keywords.map(r => r.label), data.keywords.map(r => r.c), '#EC4899');
+  renderComments(data.recentComments || []);
 })();
+
+function escHtml(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]))}
+
+function renderComments(items) {
+  const box = document.getElementById('commentsList');
+  if (!items.length) {
+    box.innerHTML = '<div class="text-center py-8 text-slate-400 text-sm">尚無民眾意見</div>';
+    return;
+  }
+  box.innerHTML = items.map(item => {
+    const date = (item.submitted_at || '').slice(0, 16).replace('T', ' ');
+    return `
+      <div class="border-l-4 border-brand-400 bg-slate-50 px-4 py-3 rounded-r-lg">
+        <div class="flex justify-between items-start gap-2 mb-1">
+          <div class="text-xs font-bold text-slate-600">${escHtml(item.question_text)}</div>
+          <div class="text-[11px] text-slate-400 shrink-0">${escHtml(date)}</div>
+        </div>
+        <div class="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">${escHtml(item.answer_text)}</div>
+        ${item.response_id ? `<div class="mt-1.5 text-right"><a href="responses.html#r${item.response_id}" class="text-[11px] text-brand-600 hover:underline">查看完整填答 →</a></div>` : ''}
+      </div>`;
+  }).join('');
+}
 </script>
 </body>
 </html>
