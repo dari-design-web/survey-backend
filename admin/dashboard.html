@@ -22,7 +22,17 @@
     <div class="bg-white rounded-xl border p-4"><h3 class="text-sm font-bold mb-3">每日填寫趨勢（近 30 天）</h3><canvas id="dailyChart" height="120"></canvas></div>
     <div class="bg-white rounded-xl border p-4"><h3 class="text-sm font-bold mb-3">每月填寫趨勢（近 12 個月）</h3><canvas id="monthlyChart" height="120"></canvas></div>
     <div class="bg-white rounded-xl border p-4"><h3 class="text-sm font-bold mb-3">各項滿意度平均</h3><canvas id="satChart" height="180"></canvas></div>
-    <div class="bg-white rounded-xl border p-4"><h3 class="text-sm font-bold mb-3">整體滿意度分布</h3><canvas id="distChart" height="160"></canvas></div>
+    <div class="bg-white rounded-xl border p-4">
+      <h3 class="text-sm font-bold mb-3">整體滿意度分布（1-5 分，%）</h3>
+      <canvas id="distChart" height="160"></canvas>
+    </div>
+    <div class="bg-white rounded-xl border p-4 md:col-span-2">
+      <div class="flex flex-wrap items-baseline gap-4 mb-3">
+        <h3 class="text-sm font-bold">NPS 推薦分數分布（0-10 分，%）</h3>
+        <div id="npsSummary" class="text-xs text-slate-600 flex flex-wrap gap-3"></div>
+      </div>
+      <canvas id="npsChart" height="80"></canvas>
+    </div>
     <div class="bg-white rounded-xl border p-4">
       <h3 class="text-sm font-bold mb-3">民眾身分別分布</h3>
       <div id="purposeBox" class="relative" style="min-height:200px"><canvas id="purposeChart" height="160"></canvas></div>
@@ -65,6 +75,42 @@ function colBar(id, labels, values, color){
   if (!values.length) { showEmpty(id, '尚無資料'); return; }
   new Chart(document.getElementById(id),{type:'bar',data:{labels,datasets:[{data:values,backgroundColor:color||'#10B981'}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
 }
+
+// NPS 分群上色：0-6 紅色（批評者）、7-8 黃色（中立）、9-10 綠色（推薦）
+function npsColors() {
+  return Array.from({length: 11}, (_, i) => {
+    if (i <= 6) return '#EF4444';
+    if (i <= 8) return '#F59E0B';
+    return '#10B981';
+  });
+}
+
+// 通用：百分比長條圖（Y 軸固定 0~100%，bar 上顯示 %）
+function renderPctBar(id, labels, values, color) {
+  if (!values.length) { showEmpty(id, '尚無資料'); return; }
+  const bgColor = Array.isArray(color) ? color : (color || '#8B5CF6');
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ data: values, backgroundColor: bgColor, borderRadius: 4 }] },
+    options: {
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: { label: c => c.parsed.y + '%' }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          suggestedMax: Math.max(10, Math.ceil(Math.max(...values) / 10) * 10),
+          ticks: { callback: v => v + '%' }
+        }
+      }
+    }
+  });
+}
 function showEmpty(canvasId, msg, boxId){
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
@@ -95,7 +141,30 @@ function showEmpty(canvasId, msg, boxId){
   lineChart('dailyChart', data.dailyTrend.map(r => r.d), data.dailyTrend.map(r => r.c), '每日');
   lineChart('monthlyChart', data.monthlyTrend.map(r => r.m), data.monthlyTrend.map(r => r.c), '每月');
   barChart('satChart', data.satisfactionAvg.map(r => r.label), data.satisfactionAvg.map(r => r.avg || 0));
-  colBar('distChart', data.overallDist.map(r => r.score + '分'), data.overallDist.map(r => r.c), '#8B5CF6');
+
+  // 整體滿意度分布 — 改成百分比，永遠 1~5 都顯示
+  renderPctBar('distChart',
+    (data.overallDist || []).map(r => r.score + '分'),
+    (data.overallDist || []).map(r => r.pct),
+    '#8B5CF6');
+
+  // NPS 0~10 分布 — 百分比
+  renderPctBar('npsChart',
+    (data.npsDist || []).map(r => r.score + '分'),
+    (data.npsDist || []).map(r => r.pct),
+    npsColors());
+
+  // NPS 三類摘要
+  const s = data.npsSummary;
+  if (s && s.total > 0) {
+    document.getElementById('npsSummary').innerHTML = `
+      <span class="px-2 py-1 rounded bg-green-50 text-green-700">推薦者 9-10：<b>${s.promoters_pct}%</b>（${s.promoters} 人）</span>
+      <span class="px-2 py-1 rounded bg-amber-50 text-amber-700">中立者 7-8：<b>${s.passives_pct}%</b>（${s.passives} 人）</span>
+      <span class="px-2 py-1 rounded bg-red-50 text-red-700">批評者 0-6：<b>${s.detractors_pct}%</b>（${s.detractors} 人）</span>
+      <span class="px-2 py-1 rounded bg-slate-100 text-slate-800">NPS 分數：<b>${s.score}</b></span>`;
+  } else {
+    document.getElementById('npsSummary').textContent = '尚無 NPS 填答';
+  }
   pieChart('purposeChart', data.purposeDist.map(r => r.label), data.purposeDist.map(r => r.c), 'purposeBox');
   pieChart('serviceChart', data.serviceDist.map(r => r.label), data.serviceDist.map(r => r.c), 'serviceBox');
   const cmap = {issued:'未兌換',redeemed:'已兌換',expired:'已逾期',voided:'已作廢',invalid:'無效'};
