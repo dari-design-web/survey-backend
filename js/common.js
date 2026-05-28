@@ -69,4 +69,30 @@
     API.clearToken();
     location.href = 'login.html';
   };
+
+  // === 時區轉換：UTC ISO 字串 → 台灣時間 (UTC+8) ===
+  // 用法：fmtTpe('2026-05-28T07:01:30+00:00') → '2026-05-28 15:01:30'
+  //       fmtTpe(isoStr, 'short')              → '2026-05-28 15:01'  (省略秒)
+  //       fmtTpe(isoStr, 'date')               → '2026-05-28'         (僅日期)
+  window.fmtTpe = function (iso, mode) {
+    if (!iso) return '—';
+    try {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return String(iso).slice(0, 19).replace('T', ' ');
+      const base = {
+        timeZone: 'Asia/Taipei',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour12: false,
+      };
+      if (mode === 'date') {
+        return d.toLocaleString('sv-SE', base);
+      }
+      const opts = { ...base, hour: '2-digit', minute: '2-digit' };
+      if (mode !== 'short') opts.second = '2-digit';
+      // sv-SE 會輸出 'YYYY-MM-DD HH:mm:ss' 格式
+      return d.toLocaleString('sv-SE', opts);
+    } catch (_) {
+      return String(iso).slice(0, 19).replace('T', ' ');
+    }
+  };
 })();
