@@ -33,7 +33,7 @@
       <thead class="bg-slate-50 text-xs uppercase text-slate-500">
         <tr><th class="px-4 py-3 text-left">ID</th><th class="px-4 py-3 text-left">填寫時間</th>
         <th class="px-4 py-3 text-left">問卷</th><th class="px-4 py-3 text-left">使用者</th>
-        <th class="px-4 py-3 text-center">整體滿意</th><th class="px-4 py-3 text-left">兌換券</th>
+        <th class="px-4 py-3 text-center" title="所有評分題的平均分數">平均分</th><th class="px-4 py-3 text-left">兌換券</th>
         <th class="px-4 py-3 text-center">操作</th></tr>
       </thead>
       <tbody id="tb" class="divide-y divide-slate-100"></tbody>
@@ -59,14 +59,18 @@ async function load() {
   });
   const { rows } = await API.get('/api/admin/responses?' + q.toString());
   document.getElementById('tb').innerHTML = rows.length ? rows.map(r => {
-    const sc = r.overall_score;
+    // 優先使用後端算好的平均分；舊版 API 退回 overall_score
+    const sc = (r.avg_score != null) ? r.avg_score : r.overall_score;
     const scoreClass = sc >= 4 ? 'text-green-600' : sc <= 2 ? 'text-red-600' : 'text-amber-600';
+    const scLabel = sc != null
+      ? `<span class="text-base">${sc}</span>${r.sat_count ? `<span class="text-[10px] text-slate-400 ml-0.5">/5</span><br><span class="text-[10px] text-slate-400 font-normal">(${r.sat_count} 題平均)</span>` : ''}`
+      : '—';
     return `<tr class="hover:bg-slate-50">
       <td class="px-4 py-3 text-slate-500">${r.id}</td>
       <td class="px-4 py-3 text-xs">${esc(fmtTpe(r.submitted_at))}</td>
       <td class="px-4 py-3">${esc(r.survey_title)}</td>
       <td class="px-4 py-3 text-xs">${esc(r.user_name || '')}<br><span class="text-slate-500">${esc(r.phone || r.email || '—')}</span></td>
-      <td class="px-4 py-3 text-center font-bold ${sc != null ? scoreClass : ''}">${sc != null ? sc : '—'}</td>
+      <td class="px-4 py-3 text-center font-bold ${sc != null ? scoreClass : ''}">${scLabel}</td>
       <td class="px-4 py-3 text-xs font-mono">${esc(r.coupon_code || '—')} ${r.coupon_status ? `<span class="text-slate-500">(${sm[r.coupon_status] || r.coupon_status})</span>` : ''}</td>
       <td class="px-4 py-3 text-center text-xs"><button onclick="detail(${r.id})" class="text-brand-600 hover:underline">查看</button></td>
     </tr>`;
