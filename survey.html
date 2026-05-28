@@ -163,8 +163,35 @@ function renderQuestion(q, num) {
     return;
   }
   try {
-    const { survey, questions: qs } = await API.get('/api/public/surveys/' + surveyId);
+    // 同時打兩個 API：問卷內容 + 預檢兌換資格
+    const did = getDeviceId();
+    const [{ survey, questions: qs }, precheck] = await Promise.all([
+      API.get('/api/public/surveys/' + surveyId),
+      API.get('/api/public/precheck/' + surveyId + '?deviceId=' + encodeURIComponent(did)).catch(() => ({ ok: false }))
+    ]);
     questions = qs;
+
+    // 如果預檢顯示不能領券，先給警告（民眾仍可填，但會看到提示）
+    let precheckBanner = '';
+    if (precheck?.ok && precheck.eligible === false) {
+      if (precheck.reason === 'interval_not_met') {
+        precheckBanner = `
+          <div class="bg-amber-50 border border-amber-300 rounded-xl p-4 text-sm text-amber-800">
+            <p class="font-bold mb-1">⚠️ 您本月已兌換過贈品</p>
+            <p class="text-xs">您仍可填寫問卷分享意見，但本次將不會再產生兌換券。</p>
+            ${precheck.nextDate ? `<p class="text-xs mt-1">下次可兌換日期：<b>${precheck.nextDate}</b></p>` : ''}
+          </div>`;
+      } else if (precheck.reason === 'existing_coupon' && precheck.existingCouponCode) {
+        precheckBanner = `
+          <div class="bg-blue-50 border border-blue-300 rounded-xl p-4 text-sm text-blue-800">
+            <p class="font-bold mb-1">ℹ️ 您已有一張未使用的兌換券</p>
+            <p class="text-xs mb-2">編號：<span class="font-mono">${precheck.existingCouponCode}</span></p>
+            <a href="coupon.html?code=${encodeURIComponent(precheck.existingCouponCode)}"
+               class="text-xs underline">查看兌換券 →</a>
+            <p class="text-xs mt-2">填寫此問卷不會再產生新券。</p>
+          </div>`;
+      }
+    }
 
     // 編號邏輯：章節不編號，其餘題目按順序 1, 2, 3...
     let n = 0;
@@ -181,10 +208,12 @@ function renderQuestion(q, num) {
         ${survey.description ? `<div class="text-sm text-slate-600 mt-3 leading-relaxed qtext bg-white border border-slate-200 rounded-xl p-4">${esc(survey.description)}</div>` : ''}
       </div>
       <form id="f" class="space-y-4">
-        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-sm text-emerald-800">
-          <p class="font-medium mb-1">✨ 匿名填寫，免登入</p>
-          <p class="text-xs text-emerald-700">您的回饋完全匿名，系統不會收集個資。完成後可獲得電子贈品兌換券。</p>
-        </div>
+        ${precheckBanner || `
+          <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-sm text-emerald-800">
+            <p class="font-medium mb-1">✨ 匿名填寫，免登入</p>
+            <p class="text-xs text-emerald-700">您的回饋完全匿名，系統不會收集個資。完成後可獲得電子贈品兌換券。</p>
+          </div>
+        `}
         ${items.map(it => it.html).join('')}
         <div id="msg" class="hidden bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm"></div>
       </form>
