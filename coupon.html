@@ -52,11 +52,11 @@ const TERMS = [
           <p class="text-xs text-slate-500 mt-2">請持本券 QR Code 至服務櫃台兌換贈品</p>
           <div class="mt-4 text-left text-sm space-y-2 border-t pt-4">
             <div class="flex justify-between"><span class="text-slate-500">兌換券編號</span><span class="font-mono">${esc(coupon.coupon_code)}</span></div>
-            <div class="flex justify-between"><span class="text-slate-500">產生時間</span><span>${esc(coupon.issued_at?.slice(0,19).replace('T',' '))}</span></div>
-            <div class="flex justify-between"><span class="text-slate-500">有效期限</span><span>${esc(coupon.expires_at?.slice(0,19).replace('T',' '))}</span></div>
+            <div class="flex justify-between"><span class="text-slate-500">產生時間</span><span>${esc(fmtTpe(coupon.issued_at))}</span></div>
+            <div class="flex justify-between"><span class="text-slate-500">有效期限</span><span>${esc(fmtTpe(coupon.expires_at))}</span></div>
             ${survey?.redemption_location ? `<div class="flex justify-between"><span class="text-slate-500">兌換地點</span><span class="text-right">${esc(survey.redemption_location)}</span></div>` : ''}
             <div class="flex justify-between"><span class="text-slate-500">兌換狀態</span><span class="font-bold text-${col}-600">${esc(lab)}</span></div>
-            ${coupon.redeemed_at ? `<div class="flex justify-between"><span class="text-slate-500">核銷時間</span><span>${esc(coupon.redeemed_at.slice(0,19).replace('T',' '))}</span></div>` : ''}
+            ${coupon.redeemed_at ? `<div class="flex justify-between"><span class="text-slate-500">核銷時間</span><span>${esc(fmtTpe(coupon.redeemed_at))}</span></div>` : ''}
           </div>
         </div>
       </div>

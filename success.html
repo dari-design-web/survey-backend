@@ -45,8 +45,30 @@ const STATUS_MAP = {
   invalid:  ['無效',   'red']
 };
 
+// 先檢查 sessionStorage 有沒有剛送出時 survey.html 暫存的 coupon
+function readCache(code) {
+  try {
+    const raw = sessionStorage.getItem('coupon_cache_' + code);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    // 30 秒內的快取才算數（避免顯示過期狀態）
+    if (Date.now() - (data.t || 0) > 30000) return null;
+    return data;
+  } catch(_) { return null; }
+}
+
 (async () => {
   if (code) {
+    // 先試 sessionStorage 快取（剛送出時的即時資料）
+    const cached = readCache(code);
+    if (cached && cached.coupon) {
+      renderCoupon(cached.coupon, cached.survey);
+      // 立即顯示後，背景靜默更新一次（不阻塞畫面）
+      API.get('/api/public/coupons/' + encodeURIComponent(code))
+        .then(r => renderCoupon(r.coupon, r.survey))
+        .catch(() => {});
+      return;
+    }
     try {
       const { coupon, survey } = await API.get('/api/public/coupons/' + encodeURIComponent(code));
       renderCoupon(coupon, survey);
@@ -102,11 +124,11 @@ function renderCoupon(coupon, survey) {
 
         <div class="text-lg font-mono font-bold text-brand-700 tracking-wider">${esc(coupon.coupon_code)}</div>
         <div class="mt-4 text-left text-sm space-y-2 border-t pt-4">
-          <div class="flex justify-between"><span class="text-slate-500">產生時間</span><span>${esc(coupon.issued_at?.slice(0,19).replace('T',' '))}</span></div>
-          <div class="flex justify-between"><span class="text-slate-500">有效期限</span><span>${esc(coupon.expires_at?.slice(0,19).replace('T',' '))}</span></div>
+          <div class="flex justify-between"><span class="text-slate-500">產生時間</span><span>${esc(fmtTpe(coupon.issued_at))}</span></div>
+          <div class="flex justify-between"><span class="text-slate-500">有效期限</span><span>${esc(fmtTpe(coupon.expires_at))}</span></div>
           ${survey?.redemption_location ? `<div class="flex justify-between"><span class="text-slate-500">兌換地點</span><span class="text-right">${esc(survey.redemption_location)}</span></div>` : ''}
           <div class="flex justify-between"><span class="text-slate-500">兌換狀態</span><span class="font-bold text-${statusColor}-600">${esc(statusLabel)}</span></div>
-          ${coupon.redeemed_at ? `<div class="flex justify-between"><span class="text-slate-500">核銷時間</span><span>${esc(coupon.redeemed_at.slice(0,19).replace('T',' '))}</span></div>` : ''}
+          ${coupon.redeemed_at ? `<div class="flex justify-between"><span class="text-slate-500">核銷時間</span><span>${esc(fmtTpe(coupon.redeemed_at))}</span></div>` : ''}
         </div>
       </div>
     </div>
