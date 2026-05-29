@@ -10,34 +10,349 @@
 <script src="../js/api.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-<style>body{font-family:'Noto Sans TC',sans-serif}</style>
+<style>
+  body{font-family:'Noto Sans TC',sans-serif}
+  .dl-btn{
+    font-size:12px;color:#475569;background:#F1F5F9;border:1px solid #CBD5E1;
+    padding:4px 10px;border-radius:6px;cursor:pointer;white-space:nowrap;
+    transition:all .15s;
+  }
+  .dl-btn:hover{background:#E2E8F0;border-color:#94A3B8;color:#0F172A}
+  .dl-btn:active{transform:scale(.97)}
+</style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
 <script>renderAdminHeader('dashboard');</script>
 <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-  <h1 class="text-2xl font-bold mb-5">統計儀表板</h1>
+  <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+    <h1 class="text-2xl font-bold">統計儀表板</h1>
+    <div class="flex items-center gap-2">
+      <label class="text-sm text-slate-600">場域：</label>
+      <select id="surveyPicker" class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white min-w-[220px]">
+        <option value="">載入中…</option>
+      </select>
+    </div>
+  </div>
   <div id="cards" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6"></div>
   <div id="neg"></div>
   <div class="grid md:grid-cols-2 gap-5">
-    <div class="bg-white rounded-xl border p-4"><h3 class="text-sm font-bold mb-3">每日填寫趨勢（近 30 天）</h3><canvas id="dailyChart" height="120"></canvas></div>
-    <div class="bg-white rounded-xl border p-4"><h3 class="text-sm font-bold mb-3">每月填寫趨勢（近 12 個月）</h3><canvas id="monthlyChart" height="120"></canvas></div>
-    <div class="bg-white rounded-xl border p-4"><h3 class="text-sm font-bold mb-3">各項滿意度平均</h3><canvas id="satChart" height="160"></canvas></div>
-    <div class="bg-white rounded-xl border p-4"><h3 class="text-sm font-bold mb-3">整體滿意度分布</h3><canvas id="distChart" height="160"></canvas></div>
-    <div class="bg-white rounded-xl border p-4"><h3 class="text-sm font-bold mb-3">來訪目的比例</h3><canvas id="purposeChart" height="160"></canvas></div>
-    <div class="bg-white rounded-xl border p-4"><h3 class="text-sm font-bold mb-3">主要使用服務比例</h3><canvas id="serviceChart" height="160"></canvas></div>
-    <div class="bg-white rounded-xl border p-4"><h3 class="text-sm font-bold mb-3">兌換券狀態</h3><canvas id="couponChart" height="160"></canvas></div>
-    <div class="bg-white rounded-xl border p-4"><h3 class="text-sm font-bold mb-3">開放式意見類別</h3><canvas id="kwChart" height="160"></canvas></div>
+    <div class="bg-white rounded-xl border p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-bold">每日填寫趨勢（近 30 天）</h3>
+        <button onclick="dl('daily-trend')" class="dl-btn">📥 下載</button>
+      </div>
+      <canvas id="dailyChart" height="120"></canvas>
+    </div>
+    <div class="bg-white rounded-xl border p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-bold">每月填寫趨勢（近 12 個月）</h3>
+        <button onclick="dl('monthly-trend')" class="dl-btn">📥 下載</button>
+      </div>
+      <canvas id="monthlyChart" height="120"></canvas>
+    </div>
+    <div class="bg-white rounded-xl border p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-bold">各項滿意度平均</h3>
+        <button onclick="dl('satisfaction-avg')" class="dl-btn">📥 下載</button>
+      </div>
+      <canvas id="satChart" height="180"></canvas>
+    </div>
+    <div class="bg-white rounded-xl border p-4">
+      <div class="flex items-center justify-between mb-1">
+        <h3 class="text-sm font-bold">滿意度評分分布（1-5 分，%）</h3>
+        <button onclick="dl('score-distribution')" class="dl-btn">📥 下載</button>
+      </div>
+      <p class="text-[11px] text-slate-500 mb-2">彙總所有滿意度評分題（Q6~Q14）的填答分布</p>
+      <canvas id="distChart" height="160"></canvas>
+    </div>
+    <div class="bg-white rounded-xl border p-4 md:col-span-2">
+      <div class="flex flex-wrap items-center gap-4 mb-3">
+        <h3 class="text-sm font-bold">NPS 推薦分數分布(0-10 分，%)</h3>
+        <div id="npsSummary" class="text-xs text-slate-600 flex flex-wrap gap-3 flex-1"></div>
+        <button onclick="dl('nps-distribution')" class="dl-btn">📥 下載</button>
+      </div>
+      <canvas id="npsChart" height="80"></canvas>
+    </div>
+    <div class="bg-white rounded-xl border p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-bold">民眾身分別分布</h3>
+        <button onclick="dl('identity-distribution')" class="dl-btn">📥 下載</button>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+        <div id="purposeBox" class="relative min-h-[160px]"><canvas id="purposeChart"></canvas></div>
+        <div id="purposeTable" class="text-xs"></div>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl border p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-bold">使用服務類型分布</h3>
+        <button onclick="dl('service-distribution')" class="dl-btn">📥 下載</button>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+        <div id="serviceBox" class="relative min-h-[160px]"><canvas id="serviceChart"></canvas></div>
+        <div id="serviceTable" class="text-xs"></div>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl border p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-bold">兌換券狀態</h3>
+        <button onclick="dl('coupon-status')" class="dl-btn">📥 下載</button>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+        <div id="couponBox" class="relative min-h-[160px]"><canvas id="couponChart"></canvas></div>
+        <div id="couponTable" class="text-xs"></div>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl border p-4">
+      <div class="flex items-center justify-between mb-1">
+        <h3 class="text-sm font-bold">每月民眾意見數量</h3>
+        <button onclick="dl('monthly-comments')" class="dl-btn">📥 下載</button>
+      </div>
+      <p class="text-[11px] text-slate-500 mb-2">統計「最滿意 / 最需改善」等開放式題目的填答數量</p>
+      <canvas id="kwChart" height="160"></canvas>
+    </div>
+  </div>
+
+  <!-- 最新民眾意見原文 -->
+  <div class="bg-white rounded-xl border p-4 mt-5">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-sm font-bold">最新民眾意見原文（近 30 筆）</h3>
+      <a href="responses.html" class="text-xs text-brand-600 hover:underline">查看全部填答 →</a>
+    </div>
+    <div id="commentsList" class="space-y-3">
+      <div class="text-center py-8 text-slate-400 text-sm">載入中…</div>
+    </div>
   </div>
 </main>
 <script>
 const COLORS = ['#2563EB','#10B981','#F59E0B','#EF4444','#8B5CF6','#06B6D4','#EC4899','#14B8A6','#F97316'];
-function lineChart(id, labels, values, label){ new Chart(document.getElementById(id),{type:'line',data:{labels,datasets:[{label,data:values,borderColor:'#2563EB',backgroundColor:'rgba(37,99,235,.1)',tension:.3,fill:true}]},options:{plugins:{legend:{display:false}}}}); }
-function barChart(id, labels, values){ new Chart(document.getElementById(id),{type:'bar',data:{labels,datasets:[{data:values,backgroundColor:'#2563EB'}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,max:5}}}}); }
-function pieChart(id, labels, values){ new Chart(document.getElementById(id),{type:'doughnut',data:{labels,datasets:[{data:values,backgroundColor:COLORS}]},options:{plugins:{legend:{position:'right'}}}}); }
-function colBar(id, labels, values, color){ new Chart(document.getElementById(id),{type:'bar',data:{labels,datasets:[{data:values,backgroundColor:color||'#10B981'}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}}); }
 
-(async () => {
-  const data = await API.get('/api/admin/dashboard');
+function lineChart(id, labels, values, label){
+  if (!values.length) { showEmpty(id, '尚無資料'); return; }
+  new Chart(document.getElementById(id),{type:'line',data:{labels,datasets:[{label,data:values,borderColor:'#2563EB',backgroundColor:'rgba(37,99,235,.1)',tension:.3,fill:true}]},options:{plugins:{legend:{display:false}}}});
+}
+function barChart(id, labels, values){
+  if (!values.length) { showEmpty(id, '尚無資料'); return; }
+  new Chart(document.getElementById(id),{type:'bar',data:{labels,datasets:[{data:values,backgroundColor:'#2563EB'}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,max:5}}}});
+}
+function pieChart(id, labels, values, boxId){
+  if (!values.length) { showEmpty(id, '尚無資料', boxId); return; }
+  new Chart(document.getElementById(id),{type:'doughnut',data:{labels,datasets:[{data:values,backgroundColor:COLORS}]},options:{plugins:{legend:{position:'right'}}}});
+}
+
+function escHtmlSafe(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]))}
+
+// 圓餅圖 + 明細表（顯示數量 / 百分比）
+function pieWithTable(chartId, tableId, boxId, items) {
+  // items: [{label, c}]
+  const total = items.reduce((sum, it) => sum + (it.c || 0), 0);
+  if (!total) {
+    if (boxId) {
+      const box = document.getElementById(boxId);
+      if (box) box.innerHTML = '<div class="flex items-center justify-center h-40 text-slate-400 text-sm">尚無資料</div>';
+    }
+    const tbl = document.getElementById(tableId);
+    if (tbl) tbl.innerHTML = '';
+    return;
+  }
+  const enriched = items.map((it, i) => ({
+    ...it,
+    pct: total ? (it.c / total * 100) : 0,
+    color: COLORS[i % COLORS.length],
+  }));
+
+  // 畫圖
+  new Chart(document.getElementById(chartId), {
+    type: 'doughnut',
+    data: {
+      labels: enriched.map(e => e.label),
+      datasets: [{
+        data: enriched.map(e => e.c),
+        backgroundColor: enriched.map(e => e.color),
+        borderWidth: 1,
+        borderColor: '#fff',
+      }],
+    },
+    options: {
+      plugins: {
+        legend: { display: false }, // 改用旁邊明細表
+        tooltip: {
+          callbacks: {
+            label: (c) => {
+              const pct = (c.parsed / total * 100).toFixed(1);
+              return `${c.label}：${c.parsed} 人 (${pct}%)`;
+            }
+          }
+        }
+      }
+    }
+  });
+
+  // 明細表
+  const rows = enriched.map(e => `
+    <tr>
+      <td class="py-1.5 pr-2 align-top">
+        <span class="inline-block w-3 h-3 rounded-sm align-middle" style="background:${e.color}"></span>
+      </td>
+      <td class="py-1.5 pr-2 align-top">${escHtmlSafe(e.label)}</td>
+      <td class="py-1.5 pr-2 text-right align-top tabular-nums">${e.c} 人</td>
+      <td class="py-1.5 text-right align-top tabular-nums font-bold text-slate-700">${e.pct.toFixed(1)}%</td>
+    </tr>`).join('');
+  const tbl = document.getElementById(tableId);
+  if (tbl) {
+    tbl.innerHTML = `
+      <table class="w-full">
+        <thead>
+          <tr class="text-[11px] text-slate-500 border-b border-slate-200">
+            <th class="py-1.5 pr-2 w-4"></th>
+            <th class="py-1.5 pr-2 text-left">類別</th>
+            <th class="py-1.5 pr-2 text-right">數量</th>
+            <th class="py-1.5 text-right">百分比</th>
+          </tr>
+        </thead>
+        <tbody>${rows}
+          <tr class="border-t border-slate-200 font-bold">
+            <td class="py-1.5 pr-2"></td>
+            <td class="py-1.5 pr-2">合計</td>
+            <td class="py-1.5 pr-2 text-right tabular-nums">${total} 人</td>
+            <td class="py-1.5 text-right tabular-nums">100%</td>
+          </tr>
+        </tbody>
+      </table>`;
+  }
+}
+function colBar(id, labels, values, color){
+  if (!values.length) { showEmpty(id, '尚無資料'); return; }
+  new Chart(document.getElementById(id),{type:'bar',data:{labels,datasets:[{data:values,backgroundColor:color||'#10B981'}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+}
+
+// NPS 分群上色：0-6 紅色（批評者）、7-8 黃色（中立）、9-10 綠色（推薦）
+function npsColors() {
+  return Array.from({length: 11}, (_, i) => {
+    if (i <= 6) return '#EF4444';
+    if (i <= 8) return '#F59E0B';
+    return '#10B981';
+  });
+}
+
+// 通用：百分比長條圖（Y 軸固定 0~100%，bar 上顯示 %）
+function renderPctBar(id, labels, values, color) {
+  if (!values.length) { showEmpty(id, '尚無資料'); return; }
+  const bgColor = Array.isArray(color) ? color : (color || '#8B5CF6');
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ data: values, backgroundColor: bgColor, borderRadius: 4 }] },
+    options: {
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: { label: c => c.parsed.y + '%' }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          suggestedMax: Math.max(10, Math.ceil(Math.max(...values) / 10) * 10),
+          ticks: { callback: v => v + '%' }
+        }
+      }
+    }
+  });
+}
+function showEmpty(canvasId, msg, boxId){
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const parent = boxId ? document.getElementById(boxId) : canvas.parentElement;
+  if (parent) {
+    parent.innerHTML = `<div class="flex items-center justify-center h-40 text-slate-400 text-sm">${msg}</div>`;
+  }
+}
+
+async function initSurveyPicker() {
+  const sel = document.getElementById('surveyPicker');
+  try {
+    const { surveys } = await API.get('/api/admin/surveys');
+    if (!surveys.length) {
+      sel.innerHTML = '<option value="">尚無問卷</option>';
+      currentSid = '';
+      return;
+    }
+    sel.innerHTML = surveys.map(s =>
+      `<option value="${s.id}">${escHtmlSafe(s.title)}</option>`
+    ).join('');
+
+    // 套用記憶值；若失效就用第一份問卷
+    const saved = localStorage.getItem(SID_KEY) || '';
+    if (saved && surveys.some(s => String(s.id) === saved)) {
+      sel.value = saved;
+      currentSid = saved;
+    } else {
+      sel.value = String(surveys[0].id);
+      currentSid = String(surveys[0].id);
+      localStorage.setItem(SID_KEY, currentSid);
+    }
+
+    sel.addEventListener('change', () => {
+      currentSid = sel.value || '';
+      localStorage.setItem(SID_KEY, currentSid);
+      loadDashboard();
+    });
+  } catch (e) {
+    sel.innerHTML = '<option value="">載入失敗</option>';
+  }
+}
+
+async function loadDashboard() {
+  if (!currentSid) return;  // 沒選或還沒有問卷時不打 API
+
+  // 重置卡片區
+  document.getElementById('cards').innerHTML = '';
+  document.getElementById('neg').innerHTML = '';
+
+  const path = '/api/admin/dashboard?survey_id=' + encodeURIComponent(currentSid);
+  const data = await API.get(path);
+  renderDashboard(data);
+}
+
+// 圖表容器 → canvas 重建設定
+const CHART_SLOTS = [
+  { canvas: 'dailyChart',   height: 120 },
+  { canvas: 'monthlyChart', height: 120 },
+  { canvas: 'satChart',     height: 180 },
+  { canvas: 'distChart',    height: 160 },
+  { canvas: 'npsChart',     height: 80  },
+  { canvas: 'purposeChart', boxId: 'purposeBox', tableId: 'purposeTable' },
+  { canvas: 'serviceChart', boxId: 'serviceBox', tableId: 'serviceTable' },
+  { canvas: 'couponChart',  boxId: 'couponBox',  tableId: 'couponTable'  },
+  { canvas: 'kwChart',      height: 160 },
+];
+
+function resetChartSlots() {
+  // 銷毀舊 Chart 實例
+  document.querySelectorAll('canvas').forEach(canvas => {
+    const existing = Chart.getChart(canvas);
+    if (existing) try { existing.destroy(); } catch(_) {}
+  });
+  // 重建可能被 showEmpty 替換掉的 canvas
+  CHART_SLOTS.forEach(slot => {
+    const targetId = slot.boxId || slot.canvas;
+    const target = document.getElementById(targetId);
+    if (!target) return;
+    const heightAttr = slot.height ? ` height="${slot.height}"` : '';
+    target.innerHTML = `<canvas id="${slot.canvas}"${heightAttr}></canvas>`;
+    if (slot.tableId) {
+      // tableId 是獨立的 div，清空內容
+      const t = document.getElementById(slot.tableId);
+      if (t) t.innerHTML = '';
+    }
+  });
+}
+
+function renderDashboard(data) {
+  resetChartSlots();
+
   const c = data.cards;
   const cards = [
     ['總問卷數', c.totalResponses, 'text-blue-700'],
@@ -57,13 +372,113 @@ function colBar(id, labels, values, color){ new Chart(document.getElementById(id
   lineChart('dailyChart', data.dailyTrend.map(r => r.d), data.dailyTrend.map(r => r.c), '每日');
   lineChart('monthlyChart', data.monthlyTrend.map(r => r.m), data.monthlyTrend.map(r => r.c), '每月');
   barChart('satChart', data.satisfactionAvg.map(r => r.label), data.satisfactionAvg.map(r => r.avg || 0));
-  colBar('distChart', data.overallDist.map(r => r.score + '分'), data.overallDist.map(r => r.c), '#8B5CF6');
-  pieChart('purposeChart', data.purposeDist.map(r => r.label), data.purposeDist.map(r => r.c));
-  pieChart('serviceChart', data.serviceDist.map(r => r.label), data.serviceDist.map(r => r.c));
+
+  // 整體滿意度分布 — 改成百分比，永遠 1~5 都顯示
+  renderPctBar('distChart',
+    (data.overallDist || []).map(r => r.score + '分'),
+    (data.overallDist || []).map(r => r.pct),
+    '#8B5CF6');
+
+  // NPS 0~10 分布 — 百分比
+  renderPctBar('npsChart',
+    (data.npsDist || []).map(r => r.score + '分'),
+    (data.npsDist || []).map(r => r.pct),
+    npsColors());
+
+  // NPS 三類摘要
+  const s = data.npsSummary;
+  if (s && s.total > 0) {
+    document.getElementById('npsSummary').innerHTML = `
+      <span class="px-2 py-1 rounded bg-green-50 text-green-700">推薦者 9-10：<b>${s.promoters_pct}%</b>（${s.promoters} 人）</span>
+      <span class="px-2 py-1 rounded bg-amber-50 text-amber-700">中立者 7-8：<b>${s.passives_pct}%</b>（${s.passives} 人）</span>
+      <span class="px-2 py-1 rounded bg-red-50 text-red-700">批評者 0-6：<b>${s.detractors_pct}%</b>（${s.detractors} 人）</span>
+      <span class="px-2 py-1 rounded bg-slate-100 text-slate-800">NPS 分數：<b>${s.score}</b></span>`;
+  } else {
+    document.getElementById('npsSummary').textContent = '尚無 NPS 填答';
+  }
+  pieWithTable('purposeChart', 'purposeTable', 'purposeBox', data.purposeDist || []);
+  pieWithTable('serviceChart', 'serviceTable', 'serviceBox', data.serviceDist || []);
+
+  // 兌換券狀態 — 隱藏數量為 0 的，並把英文 status 轉中文
   const cmap = {issued:'未兌換',redeemed:'已兌換',expired:'已逾期',voided:'已作廢',invalid:'無效'};
-  pieChart('couponChart', data.couponStatus.map(r => cmap[r.label] || r.label), data.couponStatus.map(r => r.c));
-  colBar('kwChart', data.keywords.map(r => r.label), data.keywords.map(r => r.c), '#EC4899');
+  const couponItems = (data.couponStatus || [])
+    .filter(r => (r.c || 0) > 0)
+    .map(r => ({ label: cmap[r.label] || r.label, c: r.c }));
+  pieWithTable('couponChart', 'couponTable', 'couponBox', couponItems);
+  // 每月民眾意見數量（用月份做 X 軸，含整數刻度）
+  const mc = data.monthlyComments || [];
+  const mcLabels = mc.map(r => r.m);
+  const mcValues = mc.map(r => r.c);
+  if (mcValues.every(v => v === 0)) {
+    showEmpty('kwChart', '尚無民眾意見');
+  } else {
+    new Chart(document.getElementById('kwChart'), {
+      type: 'bar',
+      data: { labels: mcLabels, datasets: [{ data: mcValues, backgroundColor: '#EC4899', borderRadius: 4 }] },
+      options: {
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: c => c.parsed.y + ' 則' } }
+        },
+        scales: {
+          y: { beginAtZero: true, ticks: { precision: 0, stepSize: 1 } }
+        }
+      }
+    });
+  }
+
+  renderComments(data.recentComments || []);
+}
+
+// 啟動：初始化選擇器，再載入儀表板
+(async () => {
+  await initSurveyPicker();
+  await loadDashboard();
 })();
+
+function escHtml(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]))}
+
+// 目前選擇的 survey_id（空字串表示全部）
+let currentSid = '';
+const SID_KEY = 'dashboard_survey_id';
+
+// 觸發整理後資料下載（使用 api.js 的 downloadUrl 把 token 放到 query）
+function dl(chartName) {
+  try {
+    let path = '/api/admin/export/chart/' + chartName;
+    if (currentSid) path += '?survey_id=' + encodeURIComponent(currentSid);
+    const url = API.downloadUrl(path);
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch (e) {
+    alert('下載失敗：' + e.message);
+  }
+}
+
+function renderComments(items) {
+  const box = document.getElementById('commentsList');
+  if (!items.length) {
+    box.innerHTML = '<div class="text-center py-8 text-slate-400 text-sm">尚無民眾意見</div>';
+    return;
+  }
+  box.innerHTML = items.map(item => {
+    const date = fmtTpe(item.submitted_at, 'short');
+    return `
+      <div class="border-l-4 border-brand-400 bg-slate-50 px-4 py-3 rounded-r-lg">
+        <div class="flex justify-between items-start gap-2 mb-1">
+          <div class="text-xs font-bold text-slate-600">${escHtml(item.question_text)}</div>
+          <div class="text-[11px] text-slate-400 shrink-0">${escHtml(date)}</div>
+        </div>
+        <div class="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">${escHtml(item.answer_text)}</div>
+        ${item.response_id ? `<div class="mt-1.5 text-right"><a href="responses.html#r${item.response_id}" class="text-[11px] text-brand-600 hover:underline">查看完整填答 →</a></div>` : ''}
+      </div>`;
+  }).join('');
+}
 </script>
 </body>
 </html>
