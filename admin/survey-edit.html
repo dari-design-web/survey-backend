@@ -261,7 +261,7 @@ async function addQ(typ) {
     is_required: !isSection,
     options: isSection ? ['（可選）章節說明文字']
       : (typ === 'single' || typ === 'multiple' || typ === 'select' ? ['選項1','選項2'] : null),
-    sort_order: (_questions.reduce((m, q) => Math.max(m, q.sort_order||0), 0) || 0) + 10,
+    sort_order: (_questions.reduce((m, q) => Math.max(m, q.sort_order||0), 0) || 0) + 1,
     include_in_statistics: !isSection,
     is_active: true,
   };
