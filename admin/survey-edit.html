@@ -152,7 +152,8 @@ async function load() {
   // 進入編輯後顯示浮動按鈕
   const fab = document.getElementById('fab');
   if (fab) { fab.classList.remove('hidden'); fab.classList.add('flex'); }
-  renderQs(questions);
+  _questions = questions || [];
+  renderQs(_questions);
 }
 
 function renderQs(qs) {
@@ -199,26 +200,94 @@ function renderQs(qs) {
   }).join('');
 }
 
+// 全域本地狀態：避免每次操作都重新跟後端拉一次完整題目
+let _questions = [];
+
+// 在頂部加一個忙碌指示器（讓使用者知道背景在儲存）
+function setBusy(label) {
+  let el = document.getElementById('busyBar');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'busyBar';
+    el.className = 'fixed top-2 right-2 z-50 hidden bg-amber-50 border border-amber-300 text-amber-800 px-3 py-1.5 rounded text-xs shadow-md';
+    document.body.appendChild(el);
+  }
+  if (label) { el.textContent = label; el.classList.remove('hidden'); }
+  else el.classList.add('hidden');
+}
+
+// addQ：先在前端產生臨時題目立刻顯示，背景送出 API，回來再用真實 id 替換
 async function addQ(typ) {
   const isSection = typ === 'section';
-  await API.post('/api/admin/surveys/' + sid + '/questions', {
+  const payload = {
     question_text: isSection ? '新章節' : '新題目',
     question_type: typ || 'single',
     is_required: !isSection,
-    options: isSection ? ['（可選）章節說明文字'] : (typ==='single'||typ==='multiple'||typ==='select' ? ['選項1','選項2'] : null),
-    sort_order: 999,
-    include_in_statistics: !isSection
-  });
-  reloadQs();
+    options: isSection ? ['（可選）章節說明文字']
+      : (typ === 'single' || typ === 'multiple' || typ === 'select' ? ['選項1','選項2'] : null),
+    sort_order: (_questions.reduce((m, q) => Math.max(m, q.sort_order||0), 0) || 0) + 10,
+    include_in_statistics: !isSection,
+    is_active: true,
+  };
+
+  // 立即用臨時 id 在畫面上顯示
+  const tempId = 'tmp_' + Date.now();
+  const optimistic = { id: tempId, ..._payloadToQuestion(payload) };
+  _questions.push(optimistic);
+  renderQs(_questions);
+
+  // 滾動到新題目位置
+  setTimeout(() => {
+    const el = document.querySelector(`[data-qid="${tempId}"]`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 50);
+
+  setBusy('儲存中…');
+  try {
+    const r = await API.post('/api/admin/surveys/' + sid + '/questions', payload);
+    if (r.question) {
+      // 用後端真實題目（含真 id）替換臨時項
+      const idx = _questions.findIndex(q => q.id === tempId);
+      if (idx >= 0) _questions[idx] = r.question;
+    } else if (r.id) {
+      const idx = _questions.findIndex(q => q.id === tempId);
+      if (idx >= 0) _questions[idx].id = r.id;
+    }
+    renderQs(_questions);
+    setBusy(null);
+  } catch (e) {
+    alert('新增失敗：' + e.message);
+    _questions = _questions.filter(q => q.id !== tempId);
+    renderQs(_questions);
+    setBusy(null);
+  }
 }
 
-async function saveQ(qid) {
+// 把送出的 payload 轉成題目顯示格式
+function _payloadToQuestion(p) {
+  return {
+    question_text: p.question_text,
+    question_type: p.question_type,
+    is_required: p.is_required ? 1 : 0,
+    options: p.options ? JSON.stringify(p.options) : null,
+    sort_order: p.sort_order || 0,
+    is_active: 1,
+    include_in_statistics: p.include_in_statistics ? 1 : 0,
+    is_satisfaction_score: 0,
+    is_overall_score: 0,
+  };
+}
+
+// 收集編輯中題目的目前 form 值
+function _collectBody(qid) {
   const root = document.querySelector(`[data-qid="${qid}"]`);
+  if (!root) return null;
   const type = root.querySelector('[data-f="type"]').value;
   const opts = root.querySelector('[data-f="options"]').value.split('\n').map(s=>s.trim()).filter(Boolean);
-  const body = {
+  return {
     question_text: root.querySelector('[data-f="text"]').value,
-    question_type: type, is_required: root.querySelector('[data-f="required"]').checked,
+    question_type: type,
+    is_required: root.querySelector('[data-f="required"]').checked,
     options: HAS_OPTIONS.has(type) ? opts : null,
     sort_order: +root.querySelector('[data-f="order"]').value || 0,
     is_active: true,
@@ -226,22 +295,65 @@ async function saveQ(qid) {
     is_satisfaction_score: root.querySelector('[data-f="sat"]').checked,
     is_overall_score: root.querySelector('[data-f="overall"]').checked
   };
+}
+
+async function saveQ(qid) {
+  // 臨時 id（剛新增還沒回來）不能存
+  if (typeof qid === 'string' && qid.startsWith('tmp_')) {
+    alert('題目剛新增，請稍候再儲存。');
+    return;
+  }
+  const body = _collectBody(qid);
+  if (!body) return;
+  const root = document.querySelector(`[data-qid="${qid}"]`);
+  const m = root.querySelector('[data-msg]');
+  m.textContent = '儲存中…'; m.className = 'text-slate-500 text-xs';
   try {
-    await API.put('/api/admin/questions/' + qid, body);
-    const m = root.querySelector('[data-msg]'); m.textContent='已儲存 ✓'; m.className='text-green-600 text-xs';
-    setTimeout(()=>m.textContent='',2000);
-  } catch (e) { alert('儲存失敗：' + e.message); }
+    const r = await API.put('/api/admin/questions/' + qid, body);
+    // 更新本地狀態
+    const idx = _questions.findIndex(q => q.id === qid);
+    if (idx >= 0) {
+      _questions[idx] = r.question || { ..._questions[idx], ..._payloadToQuestion(body) };
+    }
+    m.textContent = '已儲存 ✓'; m.className = 'text-green-600 text-xs';
+    setTimeout(() => m.textContent = '', 2000);
+  } catch (e) {
+    m.textContent = '失敗：' + e.message; m.className = 'text-red-600 text-xs';
+  }
 }
 
 async function delQ(qid) {
+  if (typeof qid === 'string' && qid.startsWith('tmp_')) {
+    // 剛新增還沒上 server，直接從本地移掉
+    _questions = _questions.filter(q => q.id !== qid);
+    renderQs(_questions);
+    return;
+  }
   if (!confirm('確定刪除此題？')) return;
-  await API.del('/api/admin/questions/' + qid);
-  reloadQs();
+  // 立刻從畫面移除（樂觀更新）
+  const backup = _questions.find(q => q.id === qid);
+  _questions = _questions.filter(q => q.id !== qid);
+  renderQs(_questions);
+
+  setBusy('刪除中…');
+  try {
+    await API.del('/api/admin/questions/' + qid);
+    setBusy(null);
+  } catch (e) {
+    // 失敗了把題目補回去
+    if (backup) _questions.push(backup);
+    _questions.sort((a, b) => (a.sort_order||0) - (b.sort_order||0));
+    renderQs(_questions);
+    alert('刪除失敗：' + e.message);
+    setBusy(null);
+  }
 }
 
+// reloadQs 保留作為「真的需要從 DB 重抓」時用（一般操作不會用到）
 async function reloadQs() {
   const { questions } = await API.get('/api/admin/surveys/' + sid);
-  renderQs(questions);
+  _questions = questions || [];
+  renderQs(_questions);
 }
 
 load();
