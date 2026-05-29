@@ -156,24 +156,19 @@ async function load() {
   renderQs(_questions);
 }
 
-function renderQs(qs) {
-  const list = document.getElementById('qList');
-  // 控制底部「+ 章節 / + 新增題目」顯示
-  const bottomAdd = document.getElementById('qBottomAdd');
-  if (bottomAdd) bottomAdd.classList.toggle('hidden', !qs.length);
-  if (bottomAdd && qs.length) bottomAdd.classList.add('flex');
-  if (!qs.length) { list.innerHTML = '<div class="text-center text-slate-400 py-8 border border-dashed rounded-lg">尚無題目</div>'; return; }
-  list.innerHTML = qs.map(q => {
-    let opts = [];
-    if (q.options) {
-      if (Array.isArray(q.options)) opts = q.options;
-      else if (typeof q.options === 'string') { try { opts = JSON.parse(q.options); } catch(_) {} }
-    }
-    if (!Array.isArray(opts)) opts = [];
-    const isSection = q.question_type === 'section';
-    const optLabel = isSection ? '章節說明文字（顯示在標題下方）' : '選項（每行一個；含「其他」者前台自動加文字欄）';
-    const showOpts = HAS_OPTIONS.has(q.question_type);
-    return `<div class="border rounded-lg p-4 ${isSection?'bg-indigo-50/40 border-indigo-200':''}" data-qid="${q.id}">
+// 將單一題目轉成 HTML 字串（addQ / renderQs 共用）
+function questionHTML(q) {
+  let opts = [];
+  if (q.options) {
+    if (Array.isArray(q.options)) opts = q.options;
+    else if (typeof q.options === 'string') { try { opts = JSON.parse(q.options); } catch(_) {} }
+  }
+  if (!Array.isArray(opts)) opts = [];
+  const isSection = q.question_type === 'section';
+  const optLabel = isSection ? '章節說明文字（顯示在標題下方）' : '選項（每行一個；含「其他」者前台自動加文字欄）';
+  const showOpts = HAS_OPTIONS.has(q.question_type);
+  const qidStr = typeof q.id === 'string' ? `'${q.id}'` : q.id;
+  return `<div class="border rounded-lg p-4 ${isSection?'bg-indigo-50/40 border-indigo-200':''}" data-qid="${q.id}">
       <div class="grid md:grid-cols-12 gap-3 text-sm">
         <div class="md:col-span-3"><label class="text-xs text-slate-500">題型</label>
           <select data-f="type" class="w-full border rounded px-2 py-1.5" onchange="this.closest('[data-qid]').dataset.type=this.value">
@@ -193,30 +188,71 @@ function renderQs(qs) {
         <label class="flex items-center gap-1"><input type="checkbox" data-f="sat" ${q.is_satisfaction_score?'checked':''}>滿意度評分題</label>
         <label class="flex items-center gap-1"><input type="checkbox" data-f="overall" ${q.is_overall_score?'checked':''}>整體滿意度</label>
         <div class="ml-auto flex items-center gap-3"><span data-msg class="text-xs"></span>
-          <button onclick="saveQ(${q.id})" class="bg-brand-600 hover:bg-brand-700 text-white px-3 py-1 rounded text-xs font-bold">儲存</button>
-          <button onclick="delQ(${q.id})" class="text-red-600 hover:underline text-xs">刪除</button>
+          <button onclick="saveQ(${qidStr})" class="bg-brand-600 hover:bg-brand-700 text-white px-3 py-1 rounded text-xs font-bold">儲存</button>
+          <button onclick="delQ(${qidStr})" class="text-red-600 hover:underline text-xs">刪除</button>
         </div>
       </div></div>`;
-  }).join('');
+}
+
+function renderQs(qs) {
+  const list = document.getElementById('qList');
+  // 控制底部「+ 章節 / + 新增題目」顯示
+  const bottomAdd = document.getElementById('qBottomAdd');
+  if (bottomAdd) bottomAdd.classList.toggle('hidden', !qs.length);
+  if (bottomAdd && qs.length) bottomAdd.classList.add('flex');
+  if (!qs.length) { list.innerHTML = '<div class="text-center text-slate-400 py-8 border border-dashed rounded-lg">尚無題目</div>'; return; }
+  list.innerHTML = qs.map(questionHTML).join('');
+}
+
+// 僅將 ONE 個題目追加到 DOM 尾端（addQ 用，避免全部重繪）
+function appendQuestionDOM(q) {
+  const list = document.getElementById('qList');
+  // 若本來是空白訊息要清掉
+  if (list.querySelector('.border-dashed')) list.innerHTML = '';
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = questionHTML(q);
+  const el = wrapper.firstElementChild;
+  list.appendChild(el);
+  return el;
+}
+
+// 從 DOM 移除某一題（delQ 用）
+function removeQuestionDOM(qid) {
+  const el = document.querySelector(`[data-qid="${qid}"]`);
+  if (el) el.remove();
+  // 列表變空時顯示空白訊息
+  const list = document.getElementById('qList');
+  if (!list.children.length) {
+    list.innerHTML = '<div class="text-center text-slate-400 py-8 border border-dashed rounded-lg">尚無題目</div>';
+  }
 }
 
 // 全域本地狀態：避免每次操作都重新跟後端拉一次完整題目
 let _questions = [];
 
-// 在頂部加一個忙碌指示器（讓使用者知道背景在儲存）
-function setBusy(label) {
-  let el = document.getElementById('busyBar');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'busyBar';
-    el.className = 'fixed top-2 right-2 z-50 hidden bg-amber-50 border border-amber-300 text-amber-800 px-3 py-1.5 rounded text-xs shadow-md';
-    document.body.appendChild(el);
-  }
-  if (label) { el.textContent = label; el.classList.remove('hidden'); }
-  else el.classList.add('hidden');
+// 忙碌指示器：延遲 500ms 顯示，快的時候完全看不到
+let _busyTimer = null;
+function setBusyDelayed(label, delay = 500) {
+  cancelBusy();
+  _busyTimer = setTimeout(() => {
+    let el = document.getElementById('busyBar');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'busyBar';
+      el.className = 'fixed top-2 right-2 z-50 bg-amber-50 border border-amber-300 text-amber-800 px-3 py-1.5 rounded text-xs shadow-md';
+      document.body.appendChild(el);
+    }
+    el.textContent = label;
+    el.classList.remove('hidden');
+  }, delay);
+}
+function cancelBusy() {
+  if (_busyTimer) { clearTimeout(_busyTimer); _busyTimer = null; }
+  const el = document.getElementById('busyBar');
+  if (el) el.classList.add('hidden');
 }
 
-// addQ：先在前端產生臨時題目立刻顯示，背景送出 API，回來再用真實 id 替換
+// addQ：局部 DOM append + 即時滾動（不等 API）
 async function addQ(typ) {
   const isSection = typ === 'section';
   const payload = {
@@ -230,36 +266,43 @@ async function addQ(typ) {
     is_active: true,
   };
 
-  // 立即用臨時 id 在畫面上顯示
-  const tempId = 'tmp_' + Date.now();
+  // 1) 立即新增到本地狀態 + 局部 append DOM（不重繪全部）
+  const tempId = 'tmp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
   const optimistic = { id: tempId, ..._payloadToQuestion(payload) };
   _questions.push(optimistic);
-  renderQs(_questions);
+  const newEl = appendQuestionDOM(optimistic);
 
-  // 滾動到新題目位置
-  setTimeout(() => {
-    const el = document.querySelector(`[data-qid="${tempId}"]`);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, 50);
+  // 2) 即時滾動到新題目（瞬間，不用平滑動畫）
+  if (newEl) {
+    newEl.scrollIntoView({ behavior: 'auto', block: 'center' });
+    // 短暫高亮提示
+    newEl.classList.add('ring-2', 'ring-emerald-400');
+    setTimeout(() => newEl.classList.remove('ring-2', 'ring-emerald-400'), 800);
+  }
 
-  setBusy('儲存中…');
+  // 3) 延遲 500ms 才顯示「儲存中…」(快的時候完全看不到)
+  setBusyDelayed('背景同步中…');
+
   try {
     const r = await API.post('/api/admin/surveys/' + sid + '/questions', payload);
-    if (r.question) {
-      // 用後端真實題目（含真 id）替換臨時項
-      const idx = _questions.findIndex(q => q.id === tempId);
-      if (idx >= 0) _questions[idx] = r.question;
-    } else if (r.id) {
-      const idx = _questions.findIndex(q => q.id === tempId);
-      if (idx >= 0) _questions[idx].id = r.id;
+    cancelBusy();
+    // 把臨時 id 換成後端回傳的真 id（不重繪畫面，只更新 dataset 跟 _questions）
+    const realQ = r.question || { ...optimistic, id: r.id };
+    const idx = _questions.findIndex(q => q.id === tempId);
+    if (idx >= 0) _questions[idx] = realQ;
+    if (newEl) {
+      newEl.setAttribute('data-qid', String(realQ.id));
+      // 更新儲存/刪除按鈕綁定的 id
+      const saveBtn = newEl.querySelector('button[onclick^="saveQ"]');
+      const delBtn = newEl.querySelector('button[onclick^="delQ"]');
+      if (saveBtn) saveBtn.setAttribute('onclick', `saveQ(${realQ.id})`);
+      if (delBtn) delBtn.setAttribute('onclick', `delQ(${realQ.id})`);
     }
-    renderQs(_questions);
-    setBusy(null);
   } catch (e) {
+    cancelBusy();
     alert('新增失敗：' + e.message);
     _questions = _questions.filter(q => q.id !== tempId);
-    renderQs(_questions);
-    setBusy(null);
+    if (newEl) newEl.remove();
   }
 }
 
@@ -323,29 +366,31 @@ async function saveQ(qid) {
 }
 
 async function delQ(qid) {
-  if (typeof qid === 'string' && qid.startsWith('tmp_')) {
+  if (typeof qid === 'string' && String(qid).startsWith('tmp_')) {
     // 剛新增還沒上 server，直接從本地移掉
     _questions = _questions.filter(q => q.id !== qid);
-    renderQs(_questions);
+    removeQuestionDOM(qid);
     return;
   }
   if (!confirm('確定刪除此題？')) return;
-  // 立刻從畫面移除（樂觀更新）
+  // 立刻從畫面移除（樂觀更新）— 局部 DOM
   const backup = _questions.find(q => q.id === qid);
   _questions = _questions.filter(q => q.id !== qid);
-  renderQs(_questions);
+  removeQuestionDOM(qid);
 
-  setBusy('刪除中…');
+  setBusyDelayed('刪除中…');
   try {
     await API.del('/api/admin/questions/' + qid);
-    setBusy(null);
+    cancelBusy();
   } catch (e) {
+    cancelBusy();
     // 失敗了把題目補回去
-    if (backup) _questions.push(backup);
-    _questions.sort((a, b) => (a.sort_order||0) - (b.sort_order||0));
-    renderQs(_questions);
+    if (backup) {
+      _questions.push(backup);
+      _questions.sort((a, b) => (a.sort_order||0) - (b.sort_order||0));
+      renderQs(_questions);
+    }
     alert('刪除失敗：' + e.message);
-    setBusy(null);
   }
 }
 
