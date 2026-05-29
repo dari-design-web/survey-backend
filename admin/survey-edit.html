@@ -171,7 +171,7 @@ function questionHTML(q) {
   return `<div class="border rounded-lg p-4 ${isSection?'bg-indigo-50/40 border-indigo-200':''}" data-qid="${q.id}">
       <div class="grid md:grid-cols-12 gap-3 text-sm">
         <div class="md:col-span-3"><label class="text-xs text-slate-500">題型</label>
-          <select data-f="type" class="w-full border rounded px-2 py-1.5" onchange="this.closest('[data-qid]').dataset.type=this.value">
+          <select data-f="type" class="w-full border rounded px-2 py-1.5" onchange="onTypeChange(this)">
             ${TYPE_OPTIONS.map(([v,l]) => `<option value="${v}" ${q.question_type===v?'selected':''}>${l}</option>`).join('')}
           </select></div>
         <div class="md:col-span-7"><label class="text-xs text-slate-500">${isSection?'章節標題':'題目（支援換行）'}</label>
@@ -214,6 +214,45 @@ function appendQuestionDOM(q) {
   const el = wrapper.firstElementChild;
   list.appendChild(el);
   return el;
+}
+
+// 題型切換時：同步顯示/隱藏選項欄，並更新標籤文字 & 章節底色
+function onTypeChange(sel) {
+  const root = sel.closest('[data-qid]');
+  if (!root) return;
+  const type = sel.value;
+  root.dataset.type = type;
+  const isSection = type === 'section';
+  const showOpts = HAS_OPTIONS.has(type);
+
+  // 選項欄顯示/隱藏
+  const optsRow = root.querySelector('[data-opts-row]');
+  if (optsRow) {
+    optsRow.style.display = showOpts ? '' : 'none';
+    // 更新標籤文字
+    const label = optsRow.querySelector('label');
+    if (label) {
+      label.textContent = isSection
+        ? '章節說明文字（顯示在標題下方）'
+        : '選項（每行一個；含「其他」者前台自動加文字欄）';
+    }
+    // 章節說明用 2 行，一般題目用 4 行
+    const ta = optsRow.querySelector('textarea[data-f="options"]');
+    if (ta) ta.rows = isSection ? 2 : 4;
+  }
+
+  // 題目文字欄的標籤也要切換（章節標題 vs 題目）
+  const textLabel = root.querySelector('label[for=""], .md\\:col-span-7 label');
+  if (textLabel) {
+    textLabel.textContent = isSection ? '章節標題' : '題目（支援換行）';
+  }
+
+  // 章節背景色
+  if (isSection) {
+    root.classList.add('bg-indigo-50/40', 'border-indigo-200');
+  } else {
+    root.classList.remove('bg-indigo-50/40', 'border-indigo-200');
+  }
 }
 
 // 從 DOM 移除某一題（delQ 用）
