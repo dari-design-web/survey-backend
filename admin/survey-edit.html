@@ -53,9 +53,13 @@
 
   <div id="qsec" class="bg-white rounded-xl border p-5 hidden">
     <!-- 頂部按鈕：sticky 黏在頁面上緣 -->
-    <div class="sticky top-0 -mx-5 -mt-5 px-5 py-3 mb-4 bg-white border-b border-slate-200 z-30 flex justify-between items-center">
+    <div class="sticky top-0 -mx-5 -mt-5 px-5 py-3 mb-4 bg-white border-b border-slate-200 z-30 flex flex-wrap justify-between items-center gap-2">
       <h2 class="font-bold text-slate-700">題目清單</h2>
-      <div class="flex gap-2">
+      <div class="flex gap-2 items-center">
+        <button id="saveAllBtnTop" onclick="saveAll()" disabled
+          class="bg-slate-200 text-slate-400 cursor-not-allowed px-4 py-1.5 rounded text-sm font-bold transition">
+          全部已儲存 ✓
+        </button>
         <button onclick="addQ('section')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded text-sm font-bold">+ 章節</button>
         <button onclick="addQ('single')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-sm font-bold">+ 新增題目</button>
       </div>
@@ -68,7 +72,11 @@
     <div id="qList" class="space-y-3"></div>
 
     <!-- 底部按鈕：題目多時不用滑回上面 -->
-    <div id="qBottomAdd" class="mt-4 hidden border-t border-dashed border-slate-300 pt-4 flex justify-center gap-2">
+    <div id="qBottomAdd" class="mt-4 hidden border-t border-dashed border-slate-300 pt-4 flex flex-wrap justify-center gap-2">
+      <button id="saveAllBtnBottom" onclick="saveAll()" disabled
+        class="bg-slate-200 text-slate-400 cursor-not-allowed px-4 py-2 rounded text-sm font-bold">
+        全部已儲存 ✓
+      </button>
       <button onclick="addQ('section')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm font-bold">+ 章節</button>
       <button onclick="addQ('single')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded text-sm font-bold">+ 新增題目</button>
     </div>
@@ -77,6 +85,10 @@
 
 <!-- 右下角浮動按鈕（FAB） -->
 <div id="fab" class="fixed bottom-6 right-6 z-40 hidden flex-col gap-2 items-end">
+  <button id="fabSave" onclick="saveAll()" disabled title="儲存全部變更"
+    class="bg-slate-300 text-slate-500 cursor-not-allowed rounded-full shadow-lg w-12 h-12 text-lg flex items-center justify-center transition-transform hover:scale-105 active:scale-95">
+    💾
+  </button>
   <button onclick="addQ('section')" title="新增章節"
     class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg w-12 h-12 text-lg font-bold flex items-center justify-center transition-transform hover:scale-105 active:scale-95">
     §
@@ -154,6 +166,8 @@ async function load() {
   if (fab) { fab.classList.remove('hidden'); fab.classList.add('flex'); }
   _questions = questions || [];
   renderQs(_questions);
+  setupDirtyTracking();
+  updateSaveAllButtons();
 }
 
 // 將單一題目轉成 HTML 字串（addQ / renderQs 共用）
@@ -187,8 +201,8 @@ function questionHTML(q) {
         <label class="flex items-center gap-1"><input type="checkbox" data-f="stat" ${q.include_in_statistics?'checked':''}>納入統計</label>
         <label class="flex items-center gap-1"><input type="checkbox" data-f="sat" ${q.is_satisfaction_score?'checked':''}>滿意度評分題</label>
         <label class="flex items-center gap-1"><input type="checkbox" data-f="overall" ${q.is_overall_score?'checked':''}>整體滿意度</label>
-        <div class="ml-auto flex items-center gap-3"><span data-msg class="text-xs"></span>
-          <button onclick="saveQ(${qidStr})" class="bg-brand-600 hover:bg-brand-700 text-white px-3 py-1 rounded text-xs font-bold">儲存</button>
+        <div class="ml-auto flex items-center gap-3">
+          <span data-dirty-flag class="hidden text-xs text-amber-600 font-medium">● 未儲存</span>
           <button onclick="delQ(${qidStr})" class="text-red-600 hover:underline text-xs">刪除</button>
         </div>
       </div></div>`;
@@ -268,6 +282,135 @@ function removeQuestionDOM(qid) {
 
 // 全域本地狀態：避免每次操作都重新跟後端拉一次完整題目
 let _questions = [];
+// 追蹤哪些題目有未儲存的變更
+const _dirty = new Set();
+
+function markDirty(qid) {
+  const key = String(qid);
+  _dirty.add(key);
+  updateSaveAllButtons();
+  const el = document.querySelector(`[data-qid="${qid}"]`);
+  if (el) {
+    el.classList.add('ring-1', 'ring-amber-300');
+    const flag = el.querySelector('[data-dirty-flag]');
+    if (flag) flag.classList.remove('hidden');
+  }
+}
+
+function clearDirty(qid) {
+  const key = String(qid);
+  _dirty.delete(key);
+  updateSaveAllButtons();
+  const el = document.querySelector(`[data-qid="${qid}"]`);
+  if (el) {
+    el.classList.remove('ring-1', 'ring-amber-300');
+    const flag = el.querySelector('[data-dirty-flag]');
+    if (flag) flag.classList.add('hidden');
+  }
+}
+
+function updateSaveAllButtons() {
+  const n = _dirty.size;
+  const text = n > 0 ? `儲存全部變更（${n}）` : '全部已儲存 ✓';
+  const onClass = ['bg-amber-600','hover:bg-amber-700','text-white'];
+  const offClass = ['bg-slate-200','text-slate-400','cursor-not-allowed'];
+  ['saveAllBtnTop','saveAllBtnBottom'].forEach(id => {
+    const b = document.getElementById(id);
+    if (!b) return;
+    b.textContent = text;
+    b.disabled = n === 0;
+    onClass.forEach(c => b.classList.toggle(c, n > 0));
+    offClass.forEach(c => b.classList.toggle(c, n === 0));
+  });
+  const fab = document.getElementById('fabSave');
+  if (fab) {
+    fab.disabled = n === 0;
+    if (n > 0) {
+      fab.className = 'bg-amber-600 hover:bg-amber-700 text-white rounded-full shadow-lg w-12 h-12 text-lg flex items-center justify-center transition-transform hover:scale-105 active:scale-95 animate-pulse';
+      fab.title = `儲存全部變更（${n}）`;
+    } else {
+      fab.className = 'bg-slate-300 text-slate-500 cursor-not-allowed rounded-full shadow-lg w-12 h-12 text-lg flex items-center justify-center';
+      fab.title = '全部已儲存';
+    }
+  }
+}
+
+// 透過事件委派監聽 qList 內所有 input/change，自動標 dirty
+function setupDirtyTracking() {
+  const list = document.getElementById('qList');
+  if (!list || list._dirtyBound) return;
+  list._dirtyBound = true;
+  ['input', 'change'].forEach(ev => {
+    list.addEventListener(ev, (e) => {
+      const root = e.target.closest('[data-qid]');
+      if (root && root.dataset.qid) markDirty(root.dataset.qid);
+    });
+  });
+}
+
+// 一次儲存所有有變更的題目
+async function saveAll() {
+  const ids = Array.from(_dirty).filter(qid => !qid.startsWith('tmp_'));
+  if (!ids.length) return;
+
+  ['saveAllBtnTop','saveAllBtnBottom'].forEach(id => {
+    const b = document.getElementById(id);
+    if (b) { b.disabled = true; b.textContent = `儲存中… (0/${ids.length})`; }
+  });
+
+  let done = 0, fails = [];
+  // 並行送出，速度最快
+  const results = await Promise.allSettled(ids.map(async (qid) => {
+    const body = _collectBody(qid);
+    if (!body) return;
+    try {
+      const r = await API.put('/api/admin/questions/' + qid, body);
+      const idx = _questions.findIndex(q => String(q.id) === qid);
+      if (idx >= 0) {
+        _questions[idx] = r.question || { ..._questions[idx], ..._payloadToQuestion(body) };
+      }
+      clearDirty(qid);
+    } catch (e) {
+      fails.push(qid + ': ' + e.message);
+      throw e;
+    } finally {
+      done++;
+      ['saveAllBtnTop','saveAllBtnBottom'].forEach(id => {
+        const b = document.getElementById(id);
+        if (b) b.textContent = `儲存中… (${done}/${ids.length})`;
+      });
+    }
+  }));
+
+  updateSaveAllButtons();
+
+  if (fails.length) {
+    alert(`儲存完成：成功 ${ids.length - fails.length} 題、失敗 ${fails.length} 題\n\n失敗：\n` + fails.join('\n'));
+  } else {
+    showToast(`已儲存 ${ids.length} 題變更 ✓`);
+  }
+}
+
+function showToast(msg) {
+  let toast = document.getElementById('saveToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'saveToast';
+    toast.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:60;background:#16a34a;color:#fff;padding:8px 16px;border-radius:8px;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,.2);transition:opacity .3s';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.opacity = '1';
+  setTimeout(() => { toast.style.opacity = '0'; }, 1800);
+}
+
+// 離開頁面前提醒未儲存
+window.addEventListener('beforeunload', (e) => {
+  if (_dirty.size > 0) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
 
 // 忙碌指示器：延遲 500ms 顯示，快的時候完全看不到
 let _busyTimer = null;
@@ -331,16 +474,22 @@ async function addQ(typ) {
     if (idx >= 0) _questions[idx] = realQ;
     if (newEl) {
       newEl.setAttribute('data-qid', String(realQ.id));
-      // 更新儲存/刪除按鈕綁定的 id
-      const saveBtn = newEl.querySelector('button[onclick^="saveQ"]');
+      // 更新刪除按鈕綁定的 id
       const delBtn = newEl.querySelector('button[onclick^="delQ"]');
-      if (saveBtn) saveBtn.setAttribute('onclick', `saveQ(${realQ.id})`);
       if (delBtn) delBtn.setAttribute('onclick', `delQ(${realQ.id})`);
+    }
+    // 若 tmp_id 已被標記 dirty（使用者邊新增邊改），轉移到真 id
+    if (_dirty.has(tempId)) {
+      _dirty.delete(tempId);
+      _dirty.add(String(realQ.id));
+      updateSaveAllButtons();
     }
   } catch (e) {
     cancelBusy();
     alert('新增失敗：' + e.message);
     _questions = _questions.filter(q => q.id !== tempId);
+    _dirty.delete(tempId);
+    updateSaveAllButtons();
     if (newEl) newEl.remove();
   }
 }
@@ -406,15 +555,17 @@ async function saveQ(qid) {
 
 async function delQ(qid) {
   if (typeof qid === 'string' && String(qid).startsWith('tmp_')) {
-    // 剛新增還沒上 server，直接從本地移掉
     _questions = _questions.filter(q => q.id !== qid);
+    _dirty.delete(String(qid));
+    updateSaveAllButtons();
     removeQuestionDOM(qid);
     return;
   }
   if (!confirm('確定刪除此題？')) return;
-  // 立刻從畫面移除（樂觀更新）— 局部 DOM
   const backup = _questions.find(q => q.id === qid);
   _questions = _questions.filter(q => q.id !== qid);
+  _dirty.delete(String(qid));
+  updateSaveAllButtons();
   removeQuestionDOM(qid);
 
   setBusyDelayed('刪除中…');
@@ -423,7 +574,6 @@ async function delQ(qid) {
     cancelBusy();
   } catch (e) {
     cancelBusy();
-    // 失敗了把題目補回去
     if (backup) {
       _questions.push(backup);
       _questions.sort((a, b) => (a.sort_order||0) - (b.sort_order||0));
