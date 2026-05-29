@@ -23,8 +23,8 @@
         <input id="f_title" class="mt-1 w-full border rounded px-3 py-2"></label>
       <label class="block"><span class="text-slate-700">場域名稱</span>
         <input id="f_location" class="mt-1 w-full border rounded px-3 py-2"></label>
-      <label class="block md:col-span-2"><span class="text-slate-700">問卷說明</span>
-        <textarea id="f_desc" rows="2" class="mt-1 w-full border rounded px-3 py-2"></textarea></label>
+      <label class="block md:col-span-2"><span class="text-slate-700">問卷說明（會顯示在問卷頂部，可多行）</span>
+        <textarea id="f_desc" rows="4" class="mt-1 w-full border rounded px-3 py-2"></textarea></label>
       <label class="block"><span class="text-slate-700">開始日期</span>
         <input id="f_start" type="date" class="mt-1 w-full border rounded px-3 py-2"></label>
       <label class="block"><span class="text-slate-700">結束日期</span>
@@ -41,6 +41,8 @@
         <input id="f_ctitle" value="贈品兌換券" class="mt-1 w-full border rounded px-3 py-2"></label>
       <label class="block"><span class="text-slate-700">兌換券副標</span>
         <input id="f_csub" value="感謝您完成滿意度調查" class="mt-1 w-full border rounded px-3 py-2"></label>
+      <label class="block md:col-span-2"><span class="text-slate-700">送出完成頁文字（可多行）</span>
+        <textarea id="f_thank" rows="3" class="mt-1 w-full border rounded px-3 py-2"></textarea></label>
     </div>
     <div class="mt-4 flex gap-2">
       <button id="saveBtn" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded font-bold text-sm">建立問卷</button>
@@ -50,17 +52,58 @@
   </div>
 
   <div id="qsec" class="bg-white rounded-xl border p-5 hidden">
-    <div class="flex justify-between items-center mb-4">
+    <!-- 頂部按鈕：sticky 黏在頁面上緣 -->
+    <div class="sticky top-0 -mx-5 -mt-5 px-5 py-3 mb-4 bg-white border-b border-slate-200 z-30 flex justify-between items-center">
       <h2 class="font-bold text-slate-700">題目清單</h2>
-      <button onclick="addQ()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-sm font-bold">+ 新增題目</button>
+      <div class="flex gap-2">
+        <button onclick="addQ('section')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded text-sm font-bold">+ 章節</button>
+        <button onclick="addQ('single')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-sm font-bold">+ 新增題目</button>
+      </div>
     </div>
+    <p class="text-xs text-slate-500 mb-3 leading-relaxed">
+      📌 提示：選項中包含「其他」二字者，前台會自動顯示一個文字輸入欄；<br>
+      📌 評分題（1-5）前台會自動附加「未使用／不適用」選項；<br>
+      📌 章節題（section）作為分段標題，不必填、不計入統計。
+    </p>
     <div id="qList" class="space-y-3"></div>
+
+    <!-- 底部按鈕：題目多時不用滑回上面 -->
+    <div id="qBottomAdd" class="mt-4 hidden border-t border-dashed border-slate-300 pt-4 flex justify-center gap-2">
+      <button onclick="addQ('section')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm font-bold">+ 章節</button>
+      <button onclick="addQ('single')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded text-sm font-bold">+ 新增題目</button>
+    </div>
   </div>
 </main>
+
+<!-- 右下角浮動按鈕（FAB） -->
+<div id="fab" class="fixed bottom-6 right-6 z-40 hidden flex-col gap-2 items-end">
+  <button onclick="addQ('section')" title="新增章節"
+    class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg w-12 h-12 text-lg font-bold flex items-center justify-center transition-transform hover:scale-105 active:scale-95">
+    §
+  </button>
+  <button onclick="addQ('single')" title="新增題目"
+    class="bg-emerald-600 hover:bg-emerald-700 text-white rounded-full shadow-lg w-14 h-14 text-2xl font-bold flex items-center justify-center transition-transform hover:scale-105 active:scale-95">
+    +
+  </button>
+</div>
 
 <script>
 let sid = Number(new URLSearchParams(location.search).get('id')) || null;
 const msg = document.getElementById('msg');
+
+const TYPE_OPTIONS = [
+  ['section', '【章節標題】'],
+  ['single',   '單選題'],
+  ['multiple', '複選題'],
+  ['rating',   '評分 1-5（含未使用）'],
+  ['nps',      'NPS 0-10'],
+  ['text',     '短文字'],
+  ['textarea', '長文字'],
+  ['phone',    '手機號碼'],
+  ['select',   '下拉選單'],
+];
+
+const HAS_OPTIONS = new Set(['single','multiple','select','section']);
 
 function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]))}
 
@@ -71,7 +114,8 @@ function readForm() {
     is_active: f_active.checked, generate_coupon: f_genCoupon.checked,
     coupon_valid_days: +f_validDays.value, redemption_interval_days: +f_interval.value,
     redemption_location: f_redLoc.value.trim(),
-    coupon_title: f_ctitle.value.trim(), coupon_subtitle: f_csub.value.trim()
+    coupon_title: f_ctitle.value.trim(), coupon_subtitle: f_csub.value.trim(),
+    thank_you_message: f_thank.value
   };
 }
 
@@ -103,12 +147,20 @@ async function load() {
   f_redLoc.value = survey.redemption_location || '';
   f_ctitle.value = survey.coupon_title || '贈品兌換券';
   f_csub.value = survey.coupon_subtitle || '感謝您完成滿意度調查';
+  f_thank.value = survey.thank_you_message || '';
   document.getElementById('qsec').classList.remove('hidden');
+  // 進入編輯後顯示浮動按鈕
+  const fab = document.getElementById('fab');
+  if (fab) { fab.classList.remove('hidden'); fab.classList.add('flex'); }
   renderQs(questions);
 }
 
 function renderQs(qs) {
   const list = document.getElementById('qList');
+  // 控制底部「+ 章節 / + 新增題目」顯示
+  const bottomAdd = document.getElementById('qBottomAdd');
+  if (bottomAdd) bottomAdd.classList.toggle('hidden', !qs.length);
+  if (bottomAdd && qs.length) bottomAdd.classList.add('flex');
   if (!qs.length) { list.innerHTML = '<div class="text-center text-slate-400 py-8 border border-dashed rounded-lg">尚無題目</div>'; return; }
   list.innerHTML = qs.map(q => {
     let opts = [];
@@ -116,20 +168,24 @@ function renderQs(qs) {
       if (Array.isArray(q.options)) opts = q.options;
       else if (typeof q.options === 'string') { try { opts = JSON.parse(q.options); } catch(_) {} }
     }
-    return `<div class="border rounded-lg p-4" data-qid="${q.id}">
+    if (!Array.isArray(opts)) opts = [];
+    const isSection = q.question_type === 'section';
+    const optLabel = isSection ? '章節說明文字（顯示在標題下方）' : '選項（每行一個；含「其他」者前台自動加文字欄）';
+    const showOpts = HAS_OPTIONS.has(q.question_type);
+    return `<div class="border rounded-lg p-4 ${isSection?'bg-indigo-50/40 border-indigo-200':''}" data-qid="${q.id}">
       <div class="grid md:grid-cols-12 gap-3 text-sm">
-        <div class="md:col-span-2"><label class="text-xs text-slate-500">題型</label>
-          <select data-f="type" class="w-full border rounded px-2 py-1.5">
-            ${[['single','單選題'],['multiple','複選題'],['rating','1-5 評分'],['text','短文字'],['textarea','長文字'],['select','下拉選單']]
-              .map(([v,l]) => `<option value="${v}" ${q.question_type===v?'selected':''}>${l}</option>`).join('')}
+        <div class="md:col-span-3"><label class="text-xs text-slate-500">題型</label>
+          <select data-f="type" class="w-full border rounded px-2 py-1.5" onchange="this.closest('[data-qid]').dataset.type=this.value">
+            ${TYPE_OPTIONS.map(([v,l]) => `<option value="${v}" ${q.question_type===v?'selected':''}>${l}</option>`).join('')}
           </select></div>
-        <div class="md:col-span-8"><label class="text-xs text-slate-500">題目</label>
-          <input data-f="text" value="${esc(q.question_text)}" class="w-full border rounded px-2 py-1.5"></div>
+        <div class="md:col-span-7"><label class="text-xs text-slate-500">${isSection?'章節標題':'題目（支援換行）'}</label>
+          <textarea data-f="text" rows="2" class="w-full border rounded px-2 py-1.5">${esc(q.question_text)}</textarea></div>
         <div class="md:col-span-2"><label class="text-xs text-slate-500">順序</label>
           <input type="number" data-f="order" value="${q.sort_order}" class="w-full border rounded px-2 py-1.5"></div>
       </div>
-      <div class="mt-3"><label class="text-xs text-slate-500">選項（每行一個）</label>
-        <textarea data-f="options" rows="3" class="w-full border rounded px-2 py-1.5 font-mono text-xs">${esc(opts.join('\n'))}</textarea></div>
+      <div class="mt-3" data-opts-row ${showOpts?'':'style="display:none"'}>
+        <label class="text-xs text-slate-500">${optLabel}</label>
+        <textarea data-f="options" rows="${isSection?2:4}" class="w-full border rounded px-2 py-1.5 font-mono text-xs">${esc(opts.join('\n'))}</textarea></div>
       <div class="mt-3 flex flex-wrap gap-4 text-xs">
         <label class="flex items-center gap-1"><input type="checkbox" data-f="required" ${q.is_required?'checked':''}>必填</label>
         <label class="flex items-center gap-1"><input type="checkbox" data-f="stat" ${q.include_in_statistics?'checked':''}>納入統計</label>
@@ -143,9 +199,16 @@ function renderQs(qs) {
   }).join('');
 }
 
-async function addQ() {
-  await API.post('/api/admin/surveys/' + sid + '/questions',
-    { question_text:'新題目', question_type:'single', is_required:true, options:['選項1','選項2'], sort_order:999 });
+async function addQ(typ) {
+  const isSection = typ === 'section';
+  await API.post('/api/admin/surveys/' + sid + '/questions', {
+    question_text: isSection ? '新章節' : '新題目',
+    question_type: typ || 'single',
+    is_required: !isSection,
+    options: isSection ? ['（可選）章節說明文字'] : (typ==='single'||typ==='multiple'||typ==='select' ? ['選項1','選項2'] : null),
+    sort_order: 999,
+    include_in_statistics: !isSection
+  });
   reloadQs();
 }
 
@@ -156,7 +219,7 @@ async function saveQ(qid) {
   const body = {
     question_text: root.querySelector('[data-f="text"]').value,
     question_type: type, is_required: root.querySelector('[data-f="required"]').checked,
-    options: ['single','multiple','select'].includes(type) ? opts : null,
+    options: HAS_OPTIONS.has(type) ? opts : null,
     sort_order: +root.querySelector('[data-f="order"]').value || 0,
     is_active: true,
     include_in_statistics: root.querySelector('[data-f="stat"]').checked,
