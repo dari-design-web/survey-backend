@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>編輯問卷</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script src="../config.js"></script>
 <script src="../js/common.js"></script>
 <script src="../js/api.js"></script>
@@ -167,6 +168,7 @@ async function load() {
   _questions = questions || [];
   renderQs(_questions);
   setupDirtyTracking();
+  initSortable();
   updateSaveAllButtons();
 }
 
@@ -182,7 +184,11 @@ function questionHTML(q) {
   const optLabel = isSection ? '章節說明文字（顯示在標題下方）' : '選項（每行一個；含「其他」者前台自動加文字欄）';
   const showOpts = HAS_OPTIONS.has(q.question_type);
   const qidStr = typeof q.id === 'string' ? `'${q.id}'` : q.id;
-  return `<div class="border rounded-lg p-4 ${isSection?'bg-indigo-50/40 border-indigo-200':''}" data-qid="${q.id}">
+  return `<div class="border rounded-lg overflow-hidden ${isSection?'border-indigo-300':'border-slate-200'}" data-qid="${q.id}">
+      <div class="drag-handle bg-slate-50 hover:bg-slate-100 cursor-move text-center text-slate-400 hover:text-slate-700 py-1 select-none text-xs border-b border-slate-200" title="按住拖曳調整順序">
+        ⋮⋮⋮ 拖曳排序 ⋮⋮⋮
+      </div>
+      <div class="p-4 ${isSection?'bg-indigo-50/40':''}">
       <div class="grid md:grid-cols-12 gap-3 text-sm">
         <div class="md:col-span-3"><label class="text-xs text-slate-500">題型</label>
           <select data-f="type" class="w-full border rounded px-2 py-1.5" onchange="onTypeChange(this)">
@@ -205,7 +211,9 @@ function questionHTML(q) {
           <span data-dirty-flag class="hidden text-xs text-amber-600 font-medium">● 未儲存</span>
           <button onclick="delQ(${qidStr})" class="text-red-600 hover:underline text-xs">刪除</button>
         </div>
-      </div></div>`;
+      </div>
+      </div>
+    </div>`;
 }
 
 function renderQs(qs) {
@@ -333,6 +341,51 @@ function updateSaveAllButtons() {
       fab.title = '全部已儲存';
     }
   }
+}
+
+// 初始化拖曳排序（SortableJS）
+function initSortable() {
+  const list = document.getElementById('qList');
+  if (!list || list._sortableInit) return;
+  if (typeof Sortable === 'undefined') {
+    console.warn('Sortable.js 未載入');
+    return;
+  }
+  list._sortableInit = true;
+
+  Sortable.create(list, {
+    handle: '.drag-handle',
+    animation: 150,
+    ghostClass: 'opacity-30',
+    chosenClass: 'shadow-lg',
+    forceFallback: false,
+    delay: 50,
+    delayOnTouchOnly: true,    // 手機觸控用按住短時間防止誤觸
+    touchStartThreshold: 5,
+    onEnd: () => {
+      // 從 DOM 重新讀取題目順序
+      const cards = list.querySelectorAll('[data-qid]');
+      const newOrderIds = Array.from(cards).map(c => c.dataset.qid);
+
+      // 同步 _questions 順序
+      const oldMap = new Map(_questions.map(q => [String(q.id), q]));
+      _questions = newOrderIds.map(qid => oldMap.get(qid)).filter(Boolean);
+
+      // 重編順序（1, 2, 3, ...），只標記真正改變的
+      _questions.forEach((q, i) => {
+        const newOrder = i + 1;
+        if (q.sort_order !== newOrder) {
+          q.sort_order = newOrder;
+          const card = list.querySelector(`[data-qid="${q.id}"]`);
+          if (card) {
+            const orderInput = card.querySelector('[data-f="order"]');
+            if (orderInput) orderInput.value = newOrder;
+            markDirty(q.id);
+          }
+        }
+      });
+    }
+  });
 }
 
 // 透過事件委派監聽 qList 內所有 input/change，自動標 dirty
