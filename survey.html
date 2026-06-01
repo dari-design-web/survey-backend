@@ -186,8 +186,10 @@ function renderQuestion(q, num) {
           <div class="bg-blue-50 border border-blue-300 rounded-xl p-4 text-sm text-blue-800">
             <p class="font-bold mb-1">ℹ️ 您已有一張未使用的兌換券</p>
             <p class="text-xs mb-2">編號：<span class="font-mono">${precheck.existingCouponCode}</span></p>
-            <a href="coupon.html?code=${encodeURIComponent(precheck.existingCouponCode)}"
-               class="text-xs underline">查看兌換券 →</a>
+            <div class="flex gap-3 text-xs">
+              <a href="coupon.html?code=${encodeURIComponent(precheck.existingCouponCode)}" class="underline">查看此張兌換券 →</a>
+              <a href="my-coupons.html" class="underline">查看我的所有兌換券 →</a>
+            </div>
             <p class="text-xs mt-2">填寫此問卷不會再產生新券。</p>
           </div>`;
       }

@@ -67,7 +67,8 @@ const TERMS = [
         </ol>
       </div>
 
-      <a href="index.html" class="mt-6 block text-center text-sm text-slate-500">返回首頁</a>`;
+      <a href="my-coupons.html" class="mt-6 block w-full text-center bg-white border-2 border-brand-600 text-brand-700 font-bold py-3 rounded-xl">查看我的所有兌換券 →</a>
+      <a href="index.html" class="mt-3 block text-center text-sm text-slate-500">返回首頁</a>`;
     const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=' + encodeURIComponent(coupon.qr_code_value || coupon.coupon_code);
     document.getElementById('qrBox').innerHTML = '<img src="' + qrUrl + '" alt="QR Code" width="240" height="240">';
   } catch (e) {
