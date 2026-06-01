@@ -454,7 +454,21 @@ function renderDashboard(data) {
   document.getElementById('cards').innerHTML = cards.map(([k, v, cls]) =>
     `<div class="bg-white rounded-xl border p-4"><div class="text-xs text-slate-500 mb-1">${k}</div><div class="text-2xl font-bold ${cls}">${v}</div></div>`).join('');
   if (c.monthNegative > 0) {
-    document.getElementById('neg').innerHTML = `<div class="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 text-sm">⚠️ 本月有 <strong class="text-red-700">${c.monthNegative}</strong> 筆不滿意回饋，請進入「填答資料」查看。</div>`;
+    // 帶上 survey_id + 本月起日 + max_score=2，點擊直接跳到篩選後的填答資料頁
+    const now = new Date();
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+    const params = new URLSearchParams();
+    if (currentSid) params.set('survey_id', currentSid);
+    params.set('date_from', monthStart);
+    params.set('max_score', '2');
+    const url = 'responses.html?' + params.toString();
+    document.getElementById('neg').innerHTML = `
+      <a href="${url}" class="block bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl p-4 mb-6 text-sm transition group">
+        <div class="flex items-center justify-between">
+          <span>⚠️ 本月有 <strong class="text-red-700 text-base">${c.monthNegative}</strong> 筆不滿意回饋（整體分 ≤ 2 分）</span>
+          <span class="text-red-700 underline font-medium group-hover:text-red-900">點此查看 →</span>
+        </div>
+      </a>`;
   }
   lineChart('dailyChart', data.dailyTrend.map(r => r.d), data.dailyTrend.map(r => r.c), '每日');
   lineChart('monthlyChart', data.monthlyTrend.map(r => r.m), data.monthlyTrend.map(r => r.c), '每月');
