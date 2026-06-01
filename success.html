@@ -112,6 +112,8 @@ function renderCoupon(coupon, survey) {
 
     <div class="bg-white border-2 border-dashed border-brand-400 rounded-2xl p-6 shadow-lg">
       <div class="text-center">
+        ${survey?.location_name ? `<div class="text-base font-bold text-slate-800 mb-1">📍 ${esc(survey.location_name)}</div>` : ''}
+        ${survey?.title ? `<div class="text-xs text-slate-500 mb-3">${esc(survey.title)}</div>` : ''}
         <div class="inline-block bg-brand-600 text-white px-3 py-1 rounded text-xs font-bold mb-3">
           ${esc(survey?.coupon_title || '贈品兌換券')}
         </div>

@@ -38,12 +38,12 @@ const TERMS = [
     const [lab, col] = sm[coupon.status] || [coupon.status, 'slate'];
     const isActive = coupon.status === 'issued';
     root.innerHTML = `
-      <h1 class="text-center text-lg font-bold text-slate-700 mb-4">${esc(survey?.coupon_title || '民眾滿意度調查贈品兌換券')}</h1>
-
       <div class="bg-white border-2 border-dashed border-brand-400 rounded-2xl p-6 shadow-lg">
         <div class="text-center">
+          ${survey?.location_name ? `<div class="text-base font-bold text-slate-800 mb-1">📍 ${esc(survey.location_name)}</div>` : ''}
+          ${survey?.title ? `<div class="text-xs text-slate-500 mb-3">${esc(survey.title)}</div>` : ''}
           <div class="inline-block bg-brand-600 text-white px-3 py-1 rounded text-xs font-bold mb-3">${esc(survey?.coupon_title || '贈品兌換券')}</div>
-          <div class="text-xs text-slate-500">${esc(survey?.coupon_subtitle || '')}</div>
+          <div class="text-xs text-slate-500">${esc(survey?.coupon_subtitle || '感謝您完成滿意度調查')}</div>
           <div class="relative my-6 inline-block p-3 bg-white rounded-lg border-2 ${isActive ? 'border-slate-900' : 'border-slate-300 opacity-50'}">
             <div id="qrBox"></div>
             ${!isActive ? `<div class="absolute inset-0 flex items-center justify-center"><div class="bg-red-500 text-white text-2xl font-bold px-6 py-2 -rotate-12 rounded">${esc(lab)}</div></div>` : ''}
@@ -51,7 +51,6 @@ const TERMS = [
           <div class="text-lg font-mono font-bold text-brand-700 tracking-wider">${esc(coupon.coupon_code)}</div>
           <p class="text-xs text-slate-500 mt-2">請持本券 QR Code 至服務櫃台兌換贈品</p>
           <div class="mt-4 text-left text-sm space-y-2 border-t pt-4">
-            <div class="flex justify-between"><span class="text-slate-500">兌換券編號</span><span class="font-mono">${esc(coupon.coupon_code)}</span></div>
             <div class="flex justify-between"><span class="text-slate-500">產生時間</span><span>${esc(fmtTpe(coupon.issued_at))}</span></div>
             <div class="flex justify-between"><span class="text-slate-500">有效期限</span><span>${esc(fmtTpe(coupon.expires_at))}</span></div>
             ${survey?.redemption_location ? `<div class="flex justify-between"><span class="text-slate-500">兌換地點</span><span class="text-right">${esc(survey.redemption_location)}</span></div>` : ''}
