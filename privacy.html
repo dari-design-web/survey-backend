@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>隱私權聲明｜滿意度調查系統</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="config.js"></script>
+<script src="js/common.js"></script>
+<script src="js/api.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>body{font-family:'Noto Sans TC',sans-serif}</style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+<main class="max-w-2xl mx-auto px-5 py-8">
+  <a href="index.html" class="inline-flex items-center text-sm text-slate-500 mb-4">
+    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+    </svg>返回首頁
+  </a>
+  <h1 class="text-2xl font-bold mb-2">隱私權聲明</h1>
+  <p class="text-xs text-slate-500 mb-6">本系統依據《個人資料保護法》及相關法規辦理，請您詳閱以下事項。</p>
+
+  <section class="bg-white border border-slate-200 rounded-xl p-6 mb-4">
+    <h2 class="text-lg font-bold text-brand-700 mb-2">一、蒐集目的</h2>
+    <p class="text-sm leading-relaxed">
+      本系統蒐集您的問卷填答內容，目的在於：
+    </p>
+    <ul class="list-disc list-inside text-sm leading-relaxed mt-2 space-y-1">
+      <li>持續改善本場域之服務品質、環境設施及整體使用體驗</li>
+      <li>進行匿名統計分析與營運參考</li>
+      <li>核發與管理電子贈品兌換券</li>
+    </ul>
+  </section>
+
+  <section class="bg-white border border-slate-200 rounded-xl p-6 mb-4">
+    <h2 class="text-lg font-bold text-brand-700 mb-2">二、蒐集項目</h2>
+    <p class="text-sm leading-relaxed mb-2">本系統採用<strong>完全匿名</strong>方式蒐集，不收集您的姓名、電話、地址、Email 或身分證等個人識別資料。實際蒐集內容如下：</p>
+    <ul class="list-disc list-inside text-sm leading-relaxed space-y-1">
+      <li><strong>問卷填答內容</strong>（您主動填寫的選項與意見）</li>
+      <li><strong>填寫時間</strong></li>
+      <li><strong>裝置識別碼（device_id）</strong> — 由您的瀏覽器隨機產生的亂數字串，儲存於您的瀏覽器中，用於識別「同一裝置是否已領過兌換券」，不對應任何真實身分</li>
+    </ul>
+    <p class="text-sm leading-relaxed mt-3 text-amber-700">
+      ⚠️ 請您於開放式意見欄位中，<strong>切勿填寫個人姓名、電話、地址、車牌等資料</strong>。一旦填入即視為您主動提供，本系統雖會妥善保管，但建議您避免提供。
+    </p>
+  </section>
+
+  <section class="bg-white border border-slate-200 rounded-xl p-6 mb-4">
+    <h2 class="text-lg font-bold text-brand-700 mb-2">三、利用方式</h2>
+    <ul class="list-disc list-inside text-sm leading-relaxed space-y-1">
+      <li>填答資料以「整體統計」方式呈現，<strong>不對外公開個別填答內容</strong></li>
+      <li>不會將您的資料提供給第三方</li>
+      <li>不會用於行銷、廣告或其他商業用途</li>
+    </ul>
+  </section>
+
+  <section class="bg-white border border-slate-200 rounded-xl p-6 mb-4">
+    <h2 class="text-lg font-bold text-brand-700 mb-2">四、保存期限</h2>
+    <ul class="list-disc list-inside text-sm leading-relaxed space-y-1">
+      <li><strong>已兌換的兌換券</strong>：核銷後 30 天自動從系統刪除</li>
+      <li><strong>已逾期或已作廢的兌換券</strong>：逾期 30 天後自動刪除</li>
+      <li><strong>問卷填答內容</strong>：以匿名方式長期保存，作為統計研究使用</li>
+      <li><strong>您的裝置識別碼</strong>：30 天無新活動可自行清除瀏覽器資料</li>
+    </ul>
+  </section>
+
+  <section class="bg-white border border-slate-200 rounded-xl p-6 mb-4">
+    <h2 class="text-lg font-bold text-brand-700 mb-2">五、您的權利</h2>
+    <p class="text-sm leading-relaxed mb-2">依個人資料保護法第三條規定，您就本系統蒐集您的個人資料得行使下列權利：</p>
+    <ul class="list-disc list-inside text-sm leading-relaxed space-y-1">
+      <li>查詢或請求閱覽</li>
+      <li>請求製給複製本</li>
+      <li>請求補充或更正</li>
+      <li>請求停止蒐集、處理或利用</li>
+      <li><strong>請求刪除</strong> — 您可至「
+        <a href="my-coupons.html" class="text-brand-600 underline">我的兌換券</a>」頁面執行「清除我的所有資料」</li>
+    </ul>
+  </section>
+
+  <section class="bg-white border border-slate-200 rounded-xl p-6 mb-4">
+    <h2 class="text-lg font-bold text-brand-700 mb-2">六、Cookie 與類似技術</h2>
+    <p class="text-sm leading-relaxed">
+      本系統使用瀏覽器的 <code class="bg-slate-100 px-1 rounded">localStorage</code> 與 cookie 儲存裝置識別碼，僅用於：
+    </p>
+    <ul class="list-disc list-inside text-sm leading-relaxed mt-2 space-y-1">
+      <li>避免同一裝置短期內重複領取兌換券</li>
+      <li>讓您可在「我的兌換券」查看自己的歷史紀錄</li>
+    </ul>
+    <p class="text-sm leading-relaxed mt-2">您可隨時於瀏覽器設定中清除這些資料。</p>
+  </section>
+
+  <section class="bg-white border border-slate-200 rounded-xl p-6 mb-4">
+    <h2 class="text-lg font-bold text-brand-700 mb-2">七、資料安全</h2>
+    <ul class="list-disc list-inside text-sm leading-relaxed space-y-1">
+      <li>所有資料傳輸採 HTTPS / TLS 加密</li>
+      <li>後台管理者帳號採 bcrypt 加密儲存密碼</li>
+      <li>資料庫採加密連線</li>
+      <li>不記錄您的 IP 位址或詳細瀏覽器資訊</li>
+    </ul>
+  </section>
+
+  <section class="bg-white border border-slate-200 rounded-xl p-6 mb-4">
+    <h2 class="text-lg font-bold text-brand-700 mb-2">八、聯絡方式</h2>
+    <p class="text-sm leading-relaxed">如對本聲明或個資使用有任何疑問，請洽各場域服務台或主辦單位。</p>
+  </section>
+
+  <p class="text-xs text-slate-400 text-center mt-6">最後更新日期：2026 年</p>
+</main>
+</body>
+</html>

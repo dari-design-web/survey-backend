@@ -85,7 +85,7 @@ function renderQuestion(q, num) {
         <input type="radio" name="q_${q.id}" value="${esc(o)}" ${reqAttr} class="text-brand-600 focus:ring-brand-500"
           ${other ? `data-other="1" onchange="document.getElementById('other_${q.id}').focus()"` : ''}>
         <span class="text-sm">${esc(o)}</span>
-        ${other ? `<input id="other_${q.id}" type="text" placeholder="請說明" class="ml-auto flex-1 min-w-0 border-b border-slate-300 px-2 py-1 text-sm focus:outline-none focus:border-brand-500" onfocus="this.previousElementSibling.previousElementSibling.checked=true">` : ''}
+        ${other ? `<input id="other_${q.id}" type="text" placeholder="請說明（勿填個資）" maxlength="50" class="ml-auto flex-1 min-w-0 border-b border-slate-300 px-2 py-1 text-sm focus:outline-none focus:border-brand-500" onfocus="this.previousElementSibling.previousElementSibling.checked=true">` : ''}
       </label>`;
     }).join('')}</div>`;
   }
@@ -97,7 +97,7 @@ function renderQuestion(q, num) {
         <input type="checkbox" name="q_${q.id}" value="${esc(o)}" class="text-brand-600 rounded focus:ring-brand-500"
           ${other ? `data-other="1"` : ''}>
         <span class="text-sm">${esc(o)}</span>
-        ${other ? `<input id="other_${q.id}" type="text" placeholder="請說明" class="ml-auto flex-1 min-w-0 border-b border-slate-300 px-2 py-1 text-sm focus:outline-none focus:border-brand-500" onfocus="this.previousElementSibling.previousElementSibling.checked=true">` : ''}
+        ${other ? `<input id="other_${q.id}" type="text" placeholder="請說明（勿填個資）" maxlength="50" class="ml-auto flex-1 min-w-0 border-b border-slate-300 px-2 py-1 text-sm focus:outline-none focus:border-brand-500" onfocus="this.previousElementSibling.previousElementSibling.checked=true">` : ''}
       </label>`;
     }).join('')}</div>`;
   }
@@ -138,7 +138,8 @@ function renderQuestion(q, num) {
     </select>`;
   }
   else if (q.question_type === 'textarea') {
-    inner = `<textarea name="q_${q.id}" rows="4" ${reqAttr} placeholder="請輸入您的意見…" class="w-full border border-slate-300 rounded-lg px-3 py-3"></textarea>`;
+    inner = `<textarea name="q_${q.id}" rows="4" ${reqAttr} placeholder="請輸入您的意見…（請勿填寫姓名、電話、地址等個人資料）" class="w-full border border-slate-300 rounded-lg px-3 py-3"></textarea>
+      <p class="text-[11px] text-amber-700 mt-1">⚠️ 請勿填寫姓名、電話、地址、車牌、身分證等個人資料。</p>`;
   }
   else if (q.question_type === 'phone') {
     inner = `<input type="tel" name="q_${q.id}" ${reqAttr} placeholder="例如：0912345678" pattern="^09\\d{8}$"
@@ -219,6 +220,10 @@ function renderQuestion(q, num) {
         ${items.map(it => it.html).join('')}
         <div id="msg" class="hidden bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm"></div>
       </form>
+      <div class="text-center text-xs text-slate-400 mt-4 pt-3 border-t border-slate-200">
+        本問卷依據《個人資料保護法》辦理，採完全匿名方式。
+        <a href="privacy.html" target="_blank" class="text-brand-600 underline">隱私權聲明</a>
+      </div>
       <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-3 shadow-lg">
         <div class="max-w-md mx-auto">
           <button id="submitBtn" form="f" type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-4 rounded-xl shadow active:scale-[0.98] transition">送出問卷</button>

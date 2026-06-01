@@ -32,6 +32,20 @@
   <div id="root">
     <div class="text-center py-12 text-slate-400">載入中…</div>
   </div>
+
+  <!-- 個資管理區 -->
+  <div class="mt-8 bg-white border border-slate-200 rounded-xl p-4 text-xs text-slate-600">
+    <p class="font-bold mb-2">🔒 您的資料權利</p>
+    <p class="leading-relaxed mb-3">
+      您隨時可以刪除您在本系統的所有紀錄（包含所有兌換券、填答內容）。
+      刪除後無法復原，請謹慎操作。
+    </p>
+    <div class="flex flex-wrap gap-2">
+      <a href="privacy.html" class="text-brand-600 underline">隱私權聲明</a>
+      <span class="text-slate-300">|</span>
+      <button onclick="clearMyData()" class="text-red-600 underline">🗑️ 清除我的所有資料</button>
+    </div>
+  </div>
 </main>
 
 <script>
@@ -143,6 +157,33 @@ function renderEmpty(title, sub) {
       <p class="text-sm text-slate-500 mb-4">${esc(sub)}</p>
       <a href="index.html" class="inline-block bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium">前往問卷首頁</a>
     </div>`;
+}
+
+async function clearMyData() {
+  const did = getDeviceId();
+  if (!did) {
+    alert('您目前沒有任何資料可清除。');
+    return;
+  }
+  if (!confirm('確定要刪除您在本系統的所有紀錄？\n\n包含：\n• 所有兌換券（含未兌換的）\n• 所有問卷填答內容\n\n⚠️ 刪除後無法復原。')) return;
+  if (!confirm('最後確認：真的要刪除嗎？')) return;
+  try {
+    const r = await fetch(window.API_BASE + '/api/public/my-data?deviceId=' + encodeURIComponent(did), {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+    const data = await r.json();
+    if (data.ok) {
+      localStorage.removeItem(DEVICE_KEY);
+      const d = data.deleted || {};
+      alert(`已刪除 ${d.coupons||0} 張兌換券、${d.responses||0} 份填答紀錄。\n您的裝置識別碼已重置。`);
+      location.href = 'index.html';
+    } else {
+      alert('刪除失敗：' + (data.message || '未知錯誤'));
+    }
+  } catch (e) {
+    alert('刪除失敗：' + e.message);
+  }
 }
 
 load();
