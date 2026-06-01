@@ -42,6 +42,16 @@
         <input id="f_ctitle" value="贈品兌換券" class="mt-1 w-full border rounded px-3 py-2"></label>
       <label class="block"><span class="text-slate-700">兌換券副標</span>
         <input id="f_csub" value="感謝您完成滿意度調查" class="mt-1 w-full border rounded px-3 py-2"></label>
+      <label class="block md:col-span-2">
+        <span class="text-slate-700">兌換券編號前綴（1-5 個英數字，自動轉大寫）</span>
+        <input id="f_cprefix" value="GIFT" maxlength="5" pattern="[A-Za-z0-9]+"
+          class="mt-1 w-full border rounded px-3 py-2 font-mono uppercase"
+          oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+        <span class="text-xs text-slate-500 mt-1 block">
+          📌 範例：GIFT-20260601-0001（預設）／NA-20260601-0001（檔案館）／RB-20260601-0001（鐵道）<br>
+          📌 不同問卷請設不同前綴，從序號就能一眼分辨是哪份問卷的券。
+        </span>
+      </label>
       <label class="block md:col-span-2"><span class="text-slate-700">送出完成頁文字（可多行）</span>
         <textarea id="f_thank" rows="3" class="mt-1 w-full border rounded px-3 py-2"></textarea></label>
     </div>
@@ -128,6 +138,7 @@ function readForm() {
     coupon_valid_days: +f_validDays.value, redemption_interval_days: +f_interval.value,
     redemption_location: f_redLoc.value.trim(),
     coupon_title: f_ctitle.value.trim(), coupon_subtitle: f_csub.value.trim(),
+    coupon_code_prefix: (f_cprefix.value || 'GIFT').trim().toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,5) || 'GIFT',
     thank_you_message: f_thank.value
   };
 }
@@ -160,6 +171,7 @@ async function load() {
   f_redLoc.value = survey.redemption_location || '';
   f_ctitle.value = survey.coupon_title || '贈品兌換券';
   f_csub.value = survey.coupon_subtitle || '感謝您完成滿意度調查';
+  f_cprefix.value = (survey.coupon_code_prefix || 'GIFT').toUpperCase();
   f_thank.value = survey.thank_you_message || '';
   document.getElementById('qsec').classList.remove('hidden');
   // 進入編輯後顯示浮動按鈕
