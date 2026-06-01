@@ -556,17 +556,6 @@ function renderDashboard(data) {
   renderComments(data.recentComments || []);
 }
 
-// 啟動：載入日期區間記憶 → 初始化場域 → 載入資料
-(async () => {
-  currentDateFrom = localStorage.getItem(DATE_FROM_KEY) || '';
-  currentDateTo = localStorage.getItem(DATE_TO_KEY) || '';
-  document.getElementById('dateFrom').value = currentDateFrom;
-  document.getElementById('dateTo').value = currentDateTo;
-  updateDateRangeHint();
-  await initSurveyPicker();
-  await loadDashboard();
-})();
-
 function escHtml(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]))}
 
 // 目前選擇的 survey_id（空字串表示全部）
@@ -686,6 +675,19 @@ function renderComments(items) {
       </div>`;
   }).join('');
 }
+
+// === 啟動：放在 script 最尾端，確保所有 const / 函式都已初始化 ===
+(async () => {
+  currentDateFrom = localStorage.getItem(DATE_FROM_KEY) || '';
+  currentDateTo = localStorage.getItem(DATE_TO_KEY) || '';
+  const dfEl = document.getElementById('dateFrom');
+  const dtEl = document.getElementById('dateTo');
+  if (dfEl) dfEl.value = currentDateFrom;
+  if (dtEl) dtEl.value = currentDateTo;
+  updateDateRangeHint();
+  await initSurveyPicker();
+  await loadDashboard();
+})();
 </script>
 </body>
 </html>
