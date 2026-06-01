@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>我的兌換券</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="config.js"></script>
+<script src="js/common.js"></script>
+<script src="js/api.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>body{font-family:'Noto Sans TC',sans-serif}</style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+<main class="max-w-md mx-auto px-5 py-6 pb-20">
+  <a href="index.html" class="inline-flex items-center text-sm text-slate-500 mb-3">
+    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+    </svg>返回首頁
+  </a>
+  <h1 class="text-2xl font-bold mb-1">我的兌換券</h1>
+  <p class="text-xs text-slate-500 mb-4">顯示您手機目前持有的所有兌換券（已兌換或過期超過 30 天會自動清除）</p>
+
+  <!-- 篩選頁籤 -->
+  <div id="filterBar" class="hidden gap-2 mb-4 border-b border-slate-200">
+    <button onclick="filterTo('all')" data-filter="all" class="filter-tab px-3 py-2 text-sm font-medium border-b-2">全部</button>
+    <button onclick="filterTo('issued')" data-filter="issued" class="filter-tab px-3 py-2 text-sm font-medium border-b-2">未兌換</button>
+    <button onclick="filterTo('redeemed')" data-filter="redeemed" class="filter-tab px-3 py-2 text-sm font-medium border-b-2">已兌換</button>
+    <button onclick="filterTo('expired')" data-filter="expired" class="filter-tab px-3 py-2 text-sm font-medium border-b-2">已過期</button>
+  </div>
+
+  <div id="root">
+    <div class="text-center py-12 text-slate-400">載入中…</div>
+  </div>
+</main>
+
+<script>
+const DEVICE_KEY = 'survey_device_id';
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]))}
+
+function getDeviceId() {
+  return localStorage.getItem(DEVICE_KEY) || '';
+}
+
+const STATUS = {
+  issued:   { label: '未兌換', color: 'green',  bg: 'bg-green-50',  border: 'border-green-200',  text: 'text-green-700' },
+  redeemed: { label: '已兌換', color: 'slate',  bg: 'bg-slate-50',  border: 'border-slate-200',  text: 'text-slate-600' },
+  expired:  { label: '已過期', color: 'red',    bg: 'bg-red-50',    border: 'border-red-200',    text: 'text-red-700' },
+  voided:   { label: '已作廢', color: 'red',    bg: 'bg-red-50',    border: 'border-red-200',    text: 'text-red-700' },
+  invalid:  { label: '無效',   color: 'slate',  bg: 'bg-slate-50',  border: 'border-slate-200',  text: 'text-slate-500' },
+};
+
+let _allCoupons = [];
+let _currentFilter = 'all';
+
+async function load() {
+  const did = getDeviceId();
+  const root = document.getElementById('root');
+  if (!did) {
+    root.innerHTML = renderEmpty('尚無兌換券', '您還沒有填寫過任何問卷，前往首頁開始：');
+    return;
+  }
+  try {
+    const r = await API.get('/api/public/my-coupons?deviceId=' + encodeURIComponent(did));
+    _allCoupons = r.coupons || [];
+    const fb = document.getElementById('filterBar');
+    if (_allCoupons.length === 0) {
+      fb.classList.add('hidden'); fb.classList.remove('flex');
+    } else {
+      fb.classList.remove('hidden'); fb.classList.add('flex');
+    }
+    if (_allCoupons.length === 0) {
+      root.innerHTML = renderEmpty('您目前沒有兌換券', '已兌換／過期超過 30 天的紀錄已自動清除。');
+    } else {
+      filterTo(_currentFilter);
+    }
+  } catch (e) {
+    root.innerHTML = `<div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4">無法載入：${esc(e.message)}</div>`;
+  }
+}
+
+function filterTo(filter) {
+  _currentFilter = filter;
+  // 更新頁籤外觀
+  document.querySelectorAll('.filter-tab').forEach(b => {
+    const active = b.dataset.filter === filter;
+    b.classList.toggle('border-brand-600', active);
+    b.classList.toggle('text-brand-700', active);
+    b.classList.toggle('border-transparent', !active);
+    b.classList.toggle('text-slate-500', !active);
+    b.classList.toggle('hover:text-slate-700', !active);
+  });
+
+  let list = _allCoupons;
+  if (filter !== 'all') {
+    list = _allCoupons.filter(c => {
+      if (filter === 'expired') return c.status === 'expired' || c.status === 'voided';
+      return c.status === filter;
+    });
+  }
+
+  const root = document.getElementById('root');
+  if (!list.length) {
+    root.innerHTML = `<div class="text-center py-12 text-slate-400 text-sm">此分類沒有兌換券</div>`;
+    return;
+  }
+  root.innerHTML = list.map(renderCard).join('');
+}
+
+function renderCard(c) {
+  const s = STATUS[c.status] || STATUS.invalid;
+  return `
+    <a href="coupon.html?code=${encodeURIComponent(c.coupon_code)}"
+       class="block bg-white border ${s.border} rounded-xl p-4 mb-3 hover:shadow-md transition">
+      <div class="flex justify-between items-start mb-2">
+        <div class="flex-1">
+          <div class="text-sm font-bold text-slate-900">📍 ${esc(c.location_name || '')}</div>
+          <div class="text-[11px] text-slate-500">${esc(c.survey_title || '')}</div>
+        </div>
+        <span class="${s.bg} ${s.text} px-2 py-1 rounded text-xs font-bold whitespace-nowrap">${s.label}</span>
+      </div>
+      <div class="font-mono text-base font-bold text-brand-700 tracking-wider mt-1">${esc(c.coupon_code)}</div>
+      <div class="mt-2 text-xs text-slate-500 space-y-1">
+        <div class="flex justify-between">
+          <span>產生時間</span>
+          <span>${esc(fmtTpe(c.issued_at))}</span>
+        </div>
+        <div class="flex justify-between">
+          <span>${c.status === 'redeemed' ? '兌換時間' : '有效期限'}</span>
+          <span>${esc(c.status === 'redeemed' ? fmtTpe(c.redeemed_at) : fmtTpe(c.expires_at))}</span>
+        </div>
+        ${c.redemption_location ? `<div class="flex justify-between"><span>兌換地點</span><span class="text-right">${esc(c.redemption_location)}</span></div>` : ''}
+      </div>
+      <div class="mt-3 text-right text-xs text-brand-600 font-medium">查看 QR Code →</div>
+    </a>`;
+}
+
+function renderEmpty(title, sub) {
+  return `
+    <div class="bg-white border border-slate-200 rounded-xl p-8 text-center">
+      <div class="text-5xl mb-3">🎟️</div>
+      <h2 class="text-lg font-bold text-slate-700 mb-1">${esc(title)}</h2>
+      <p class="text-sm text-slate-500 mb-4">${esc(sub)}</p>
+      <a href="index.html" class="inline-block bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium">前往問卷首頁</a>
+    </div>`;
+}
+
+load();
+</script>
+</body>
+</html>
