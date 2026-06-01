@@ -49,6 +49,17 @@ async function init() {
   const { surveys } = await API.get('/api/admin/surveys');
   document.getElementById('survey_id').innerHTML = '<option value="">所有問卷</option>' +
     surveys.map(s => `<option value="${s.id}">${esc(s.title)}</option>`).join('');
+
+  // 從 URL 參數自動套篩選（讓儀表板的「點此查看」連結可帶條件進來）
+  const url = new URLSearchParams(location.search);
+  ['survey_id','date_from','date_to','min_score','max_score'].forEach(k => {
+    const v = url.get(k);
+    if (v != null && v !== '') {
+      const el = document.getElementById(k);
+      if (el) el.value = v;
+    }
+  });
+
   load();
 }
 async function load() {
