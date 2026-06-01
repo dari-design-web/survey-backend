@@ -19,12 +19,19 @@
   }
   .dl-btn:hover{background:#E2E8F0;border-color:#94A3B8;color:#0F172A}
   .dl-btn:active{transform:scale(.97)}
+  .preset-btn{
+    font-size:12px;color:#475569;background:#F8FAFC;border:1px solid #CBD5E1;
+    padding:3px 8px;border-radius:4px;cursor:pointer;white-space:nowrap;
+    transition:all .15s;
+  }
+  .preset-btn:hover{background:#E2E8F0;border-color:#94A3B8;color:#0F172A}
+  .preset-btn.active{background:#2563EB;color:#fff;border-color:#2563EB}
 </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
 <script>renderAdminHeader('dashboard');</script>
 <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-  <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+  <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
     <h1 class="text-2xl font-bold">統計儀表板</h1>
     <div class="flex items-center gap-2">
       <label class="text-sm text-slate-600">場域：</label>
@@ -32,6 +39,24 @@
         <option value="">載入中…</option>
       </select>
     </div>
+  </div>
+
+  <!-- 日期區間篩選 -->
+  <div class="bg-white border border-slate-200 rounded-lg p-3 mb-5 flex flex-wrap items-center gap-2 text-sm">
+    <label class="text-slate-600 font-medium">📅 時間區間：</label>
+    <input id="dateFrom" type="date" class="border border-slate-300 rounded px-2 py-1 text-sm" onchange="dateRangeChanged()">
+    <span class="text-slate-400">～</span>
+    <input id="dateTo" type="date" class="border border-slate-300 rounded px-2 py-1 text-sm" onchange="dateRangeChanged()">
+    <div class="flex flex-wrap gap-1 ml-2">
+      <button onclick="setPreset('today')" class="preset-btn">今日</button>
+      <button onclick="setPreset('7d')" class="preset-btn">近 7 天</button>
+      <button onclick="setPreset('month')" class="preset-btn">本月</button>
+      <button onclick="setPreset('30d')" class="preset-btn">近 30 天</button>
+      <button onclick="setPreset('90d')" class="preset-btn">近 90 天</button>
+      <button onclick="setPreset('year')" class="preset-btn">今年</button>
+      <button onclick="setPreset('all')" class="preset-btn">全部</button>
+    </div>
+    <span id="dateRangeHint" class="text-xs text-slate-500 ml-auto"></span>
   </div>
   <div id="cards" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6"></div>
   <div id="neg"></div>
@@ -301,13 +326,11 @@ async function initSurveyPicker() {
 }
 
 async function loadDashboard() {
-  if (!currentSid) return;  // 沒選或還沒有問卷時不打 API
-
-  // 重置卡片區
+  if (!currentSid) return;
   document.getElementById('cards').innerHTML = '';
   document.getElementById('neg').innerHTML = '';
-
-  const path = '/api/admin/dashboard?survey_id=' + encodeURIComponent(currentSid);
+  const q = _buildQuery();
+  const path = '/api/admin/dashboard' + (q ? '?' + q : '');
   const data = await API.get(path);
   renderDashboard(data);
 }
@@ -402,7 +425,8 @@ function collapseAllCats() {
 function dlQ(qid) {
   try {
     let path = '/api/admin/export/question/' + qid;
-    if (currentSid) path += '?survey_id=' + encodeURIComponent(currentSid);
+    const q = _buildQuery();
+    if (q) path += '?' + q;
     const url = API.downloadUrl(path);
     const a = document.createElement('a');
     a.href = url;
@@ -454,12 +478,13 @@ function renderDashboard(data) {
   document.getElementById('cards').innerHTML = cards.map(([k, v, cls]) =>
     `<div class="bg-white rounded-xl border p-4"><div class="text-xs text-slate-500 mb-1">${k}</div><div class="text-2xl font-bold ${cls}">${v}</div></div>`).join('');
   if (c.monthNegative > 0) {
-    // 帶上 survey_id + 本月起日 + max_score=2，點擊直接跳到篩選後的填答資料頁
+    // 帶上 survey_id + 日期區間（沒設就用本月）+ max_score=2
     const now = new Date();
-    const monthStart = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+    const defaultMonthStart = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
     const params = new URLSearchParams();
     if (currentSid) params.set('survey_id', currentSid);
-    params.set('date_from', monthStart);
+    params.set('date_from', currentDateFrom || defaultMonthStart);
+    if (currentDateTo) params.set('date_to', currentDateTo);
     params.set('max_score', '2');
     const url = 'responses.html?' + params.toString();
     document.getElementById('neg').innerHTML = `
@@ -531,8 +556,13 @@ function renderDashboard(data) {
   renderComments(data.recentComments || []);
 }
 
-// 啟動：初始化選擇器，再載入儀表板
+// 啟動：載入日期區間記憶 → 初始化場域 → 載入資料
 (async () => {
+  currentDateFrom = localStorage.getItem(DATE_FROM_KEY) || '';
+  currentDateTo = localStorage.getItem(DATE_TO_KEY) || '';
+  document.getElementById('dateFrom').value = currentDateFrom;
+  document.getElementById('dateTo').value = currentDateTo;
+  updateDateRangeHint();
   await initSurveyPicker();
   await loadDashboard();
 })();
@@ -541,13 +571,89 @@ function escHtml(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<'
 
 // 目前選擇的 survey_id（空字串表示全部）
 let currentSid = '';
+let currentDateFrom = '';
+let currentDateTo = '';
 const SID_KEY = 'dashboard_survey_id';
+const DATE_FROM_KEY = 'dashboard_date_from';
+const DATE_TO_KEY = 'dashboard_date_to';
+
+function _buildQuery() {
+  const p = new URLSearchParams();
+  if (currentSid) p.set('survey_id', currentSid);
+  if (currentDateFrom) p.set('date_from', currentDateFrom);
+  if (currentDateTo) p.set('date_to', currentDateTo);
+  return p.toString();
+}
+
+// === 日期區間 ===
+function pad(n) { return String(n).padStart(2, '0'); }
+function toDateStr(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+
+function setPreset(preset) {
+  const now = new Date();
+  let from = '', to = '';
+  if (preset === 'today') {
+    from = to = toDateStr(now);
+  } else if (preset === '7d') {
+    const d = new Date(now); d.setDate(d.getDate() - 6);
+    from = toDateStr(d); to = toDateStr(now);
+  } else if (preset === 'month') {
+    from = `${now.getFullYear()}-${pad(now.getMonth()+1)}-01`;
+    to = toDateStr(now);
+  } else if (preset === '30d') {
+    const d = new Date(now); d.setDate(d.getDate() - 29);
+    from = toDateStr(d); to = toDateStr(now);
+  } else if (preset === '90d') {
+    const d = new Date(now); d.setDate(d.getDate() - 89);
+    from = toDateStr(d); to = toDateStr(now);
+  } else if (preset === 'year') {
+    from = `${now.getFullYear()}-01-01`;
+    to = toDateStr(now);
+  } else if (preset === 'all') {
+    from = ''; to = '';
+  }
+  document.getElementById('dateFrom').value = from;
+  document.getElementById('dateTo').value = to;
+  // 標記當前 active 按鈕
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.querySelector(`.preset-btn[onclick="setPreset('${preset}')"]`);
+  if (btn) btn.classList.add('active');
+  dateRangeChanged();
+}
+
+function dateRangeChanged() {
+  currentDateFrom = document.getElementById('dateFrom').value || '';
+  currentDateTo = document.getElementById('dateTo').value || '';
+  localStorage.setItem(DATE_FROM_KEY, currentDateFrom);
+  localStorage.setItem(DATE_TO_KEY, currentDateTo);
+  updateDateRangeHint();
+  loadDashboard();
+}
+
+function updateDateRangeHint() {
+  const hint = document.getElementById('dateRangeHint');
+  if (!hint) return;
+  if (!currentDateFrom && !currentDateTo) {
+    hint.textContent = '顯示全部資料';
+  } else if (currentDateFrom && currentDateTo) {
+    if (currentDateFrom === currentDateTo) {
+      hint.textContent = `僅顯示 ${currentDateFrom} 當天`;
+    } else {
+      hint.textContent = `${currentDateFrom} ~ ${currentDateTo}`;
+    }
+  } else if (currentDateFrom) {
+    hint.textContent = `${currentDateFrom} 之後`;
+  } else {
+    hint.textContent = `${currentDateTo} 之前`;
+  }
+}
 
 // 觸發整理後資料下載（使用 api.js 的 downloadUrl 把 token 放到 query）
 function dl(chartName) {
   try {
     let path = '/api/admin/export/chart/' + chartName;
-    if (currentSid) path += '?survey_id=' + encodeURIComponent(currentSid);
+    const q = _buildQuery();
+    if (q) path += '?' + q;
     const url = API.downloadUrl(path);
     const a = document.createElement('a');
     a.href = url;
