@@ -75,26 +75,6 @@
     </div>
     <div class="bg-white rounded-xl border p-4">
       <div class="flex items-center justify-between mb-3">
-        <h3 class="text-sm font-bold">民眾身分別分布</h3>
-        <button onclick="dl('identity-distribution')" class="dl-btn">📥 下載</button>
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-        <div id="purposeBox" class="relative min-h-[160px]"><canvas id="purposeChart"></canvas></div>
-        <div id="purposeTable" class="text-xs"></div>
-      </div>
-    </div>
-    <div class="bg-white rounded-xl border p-4">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="text-sm font-bold">使用服務類型分布</h3>
-        <button onclick="dl('service-distribution')" class="dl-btn">📥 下載</button>
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-        <div id="serviceBox" class="relative min-h-[160px]"><canvas id="serviceChart"></canvas></div>
-        <div id="serviceTable" class="text-xs"></div>
-      </div>
-    </div>
-    <div class="bg-white rounded-xl border p-4">
-      <div class="flex items-center justify-between mb-3">
         <h3 class="text-sm font-bold">兌換券狀態</h3>
         <button onclick="dl('coupon-status')" class="dl-btn">📥 下載</button>
       </div>
@@ -110,6 +90,22 @@
       </div>
       <p class="text-[11px] text-slate-500 mb-2">統計「最滿意 / 最需改善」等開放式題目的填答數量</p>
       <canvas id="kwChart" height="160"></canvas>
+    </div>
+  </div>
+
+  <!-- 問卷分項統計（依該問卷所有單選/複選/下拉題自動產生） -->
+  <div class="bg-white rounded-xl border p-4 mt-5">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <h3 class="text-sm font-bold">🔍 問卷分項統計
+        <span class="text-[11px] font-normal text-slate-500 ml-1">（自動列出本問卷所有單選/複選題的填答分布）</span>
+      </h3>
+      <div class="flex gap-2">
+        <button onclick="expandAllCats()" class="dl-btn">全部展開</button>
+        <button onclick="collapseAllCats()" class="dl-btn">全部收合</button>
+      </div>
+    </div>
+    <div id="categoricalList" class="space-y-2">
+      <div class="text-center py-6 text-slate-400 text-sm">載入中…</div>
     </div>
   </div>
 
@@ -323,11 +319,102 @@ const CHART_SLOTS = [
   { canvas: 'satChart',     height: 180 },
   { canvas: 'distChart',    height: 160 },
   { canvas: 'npsChart',     height: 80  },
-  { canvas: 'purposeChart', boxId: 'purposeBox', tableId: 'purposeTable' },
-  { canvas: 'serviceChart', boxId: 'serviceBox', tableId: 'serviceTable' },
   { canvas: 'couponChart',  boxId: 'couponBox',  tableId: 'couponTable'  },
   { canvas: 'kwChart',      height: 160 },
 ];
+
+// 記住已渲染過的分項統計 chart instance（為了 destroy 重建）
+const _catRendered = new Set();
+let _catData = [];
+
+function renderCategoricalSection(items) {
+  _catData = items || [];
+  _catRendered.clear();
+  const box = document.getElementById('categoricalList');
+  if (!_catData.length) {
+    box.innerHTML = '<div class="text-center py-8 text-slate-400 text-sm">此問卷沒有單選/複選題，或尚無填答資料</div>';
+    return;
+  }
+  box.innerHTML = _catData.map((it, idx) => {
+    const slotId = 'cat_' + it.q_id;
+    const typeLabel = ({single:'單選', multiple:'複選', select:'下拉'})[it.q_type] || it.q_type;
+    return `
+      <div class="border border-slate-200 rounded-lg overflow-hidden" data-cat-id="${it.q_id}">
+        <div class="flex items-center px-3 py-2 hover:bg-slate-50">
+          <button onclick="toggleCat('${slotId}')" class="flex-1 flex items-center gap-2 text-left">
+            <span id="${slotId}_arrow" class="text-slate-400 text-xs w-3">▶</span>
+            <span class="text-sm font-medium text-slate-800">${escHtmlSafe(it.q_text)}</span>
+            <span class="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">${typeLabel}</span>
+            <span class="text-[11px] text-slate-500 ml-auto mr-2">共 ${it.total} 筆</span>
+          </button>
+          <button onclick="dlQ(${it.q_id})" class="dl-btn text-xs">📥</button>
+        </div>
+        <div id="${slotId}_body" class="hidden border-t border-slate-200 p-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+            <div id="${slotId}_box" class="relative min-h-[160px]">
+              <canvas id="${slotId}_chart"></canvas>
+            </div>
+            <div id="${slotId}_table" class="text-xs"></div>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function toggleCat(slotId) {
+  const body = document.getElementById(slotId + '_body');
+  const arrow = document.getElementById(slotId + '_arrow');
+  if (!body) return;
+  const isHidden = body.classList.contains('hidden');
+  if (isHidden) {
+    body.classList.remove('hidden');
+    if (arrow) arrow.textContent = '▼';
+    // Lazy render：展開時才畫圖
+    if (!_catRendered.has(slotId)) {
+      const qid = parseInt(slotId.replace('cat_', ''));
+      const item = _catData.find(d => d.q_id === qid);
+      if (item) {
+        pieWithTable(slotId + '_chart', slotId + '_table', slotId + '_box', item.items);
+      }
+      _catRendered.add(slotId);
+    }
+  } else {
+    body.classList.add('hidden');
+    if (arrow) arrow.textContent = '▶';
+  }
+}
+
+function expandAllCats() {
+  _catData.forEach(it => {
+    const body = document.getElementById('cat_' + it.q_id + '_body');
+    if (body && body.classList.contains('hidden')) toggleCat('cat_' + it.q_id);
+  });
+}
+
+function collapseAllCats() {
+  _catData.forEach(it => {
+    const body = document.getElementById('cat_' + it.q_id + '_body');
+    if (body && !body.classList.contains('hidden')) toggleCat('cat_' + it.q_id);
+  });
+}
+
+// 單題目下載
+function dlQ(qid) {
+  try {
+    let path = '/api/admin/export/question/' + qid;
+    if (currentSid) path += '?survey_id=' + encodeURIComponent(currentSid);
+    const url = API.downloadUrl(path);
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch (e) {
+    alert('下載失敗：' + e.message);
+  }
+}
 
 function resetChartSlots() {
   // 銷毀舊 Chart 實例
@@ -396,8 +483,8 @@ function renderDashboard(data) {
   } else {
     document.getElementById('npsSummary').textContent = '尚無 NPS 填答';
   }
-  pieWithTable('purposeChart', 'purposeTable', 'purposeBox', data.purposeDist || []);
-  pieWithTable('serviceChart', 'serviceTable', 'serviceBox', data.serviceDist || []);
+  // === 問卷分項統計（動態列出所有 single/multiple 題的分布）===
+  renderCategoricalSection(data.categoricalDist || []);
 
   // 兌換券狀態 — 隱藏數量為 0 的，並把英文 status 轉中文
   const cmap = {issued:'未兌換',redeemed:'已兌換',expired:'已逾期',voided:'已作廢',invalid:'無效'};
