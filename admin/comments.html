@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>民眾意見原文</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../config.js"></script>
+<script src="../js/common.js"></script>
+<script src="../js/api.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>body{font-family:'Noto Sans TC',sans-serif}</style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+<script>renderAdminHeader('responses');</script>
+<main class="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+  <div class="flex items-center justify-between mb-5">
+    <h1 class="text-2xl font-bold">💬 民眾意見原文</h1>
+    <a href="responses.html" class="text-sm text-brand-600 hover:underline">查看完整填答資料 →</a>
+  </div>
+  <p class="text-sm text-slate-500 mb-4">只列出開放式長文字題（最滿意 / 最需改善 等）的民眾回饋。</p>
+
+  <!-- 篩選 -->
+  <form id="filter" class="bg-white border rounded-xl p-4 mb-5 flex flex-wrap gap-3 items-end">
+    <div>
+      <label class="text-xs text-slate-500 block mb-1">問卷</label>
+      <select id="survey_id" class="border border-slate-300 rounded px-3 py-2 text-sm min-w-[200px]">
+        <option value="">所有問卷</option>
+      </select>
+    </div>
+    <div>
+      <label class="text-xs text-slate-500 block mb-1">起始日</label>
+      <input id="date_from" type="date" class="border border-slate-300 rounded px-3 py-2 text-sm">
+    </div>
+    <div>
+      <label class="text-xs text-slate-500 block mb-1">結束日</label>
+      <input id="date_to" type="date" class="border border-slate-300 rounded px-3 py-2 text-sm">
+    </div>
+    <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2 rounded text-sm font-bold">查詢</button>
+  </form>
+
+  <!-- 統計列 -->
+  <div id="stats" class="text-sm text-slate-600 mb-3"></div>
+
+  <!-- 意見列表 -->
+  <div id="commentsList" class="space-y-3">
+    <div class="text-center py-12 text-slate-400">載入中…</div>
+  </div>
+
+  <!-- 分頁 -->
+  <div id="pagination" class="mt-6 flex flex-wrap items-center justify-center gap-2 hidden">
+    <button onclick="goPage(1)" id="firstBtn" class="page-btn">« 第一頁</button>
+    <button onclick="goPage(currentPage-1)" id="prevBtn" class="page-btn">← 上一頁</button>
+    <span id="pageInfo" class="px-3 py-2 text-sm font-medium text-slate-700"></span>
+    <button onclick="goPage(currentPage+1)" id="nextBtn" class="page-btn">下一頁 →</button>
+    <button onclick="goPage(totalPages)" id="lastBtn" class="page-btn">最後一頁 »</button>
+  </div>
+</main>
+
+<style>
+.page-btn {
+  padding: 6px 12px; font-size: 13px; color: #475569;
+  background: #fff; border: 1px solid #CBD5E1; border-radius: 6px;
+  cursor: pointer; transition: all .15s;
+}
+.page-btn:hover:not(:disabled) { background: #F1F5F9; border-color: #94A3B8; }
+.page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+</style>
+
+<script>
+let currentPage = 1;
+let totalPages = 1;
+const PAGE_SIZE = 50;
+
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]))}
+
+async function init() {
+  // 載入問卷下拉
+  try {
+    const { surveys } = await API.get('/api/admin/surveys');
+    document.getElementById('survey_id').innerHTML = '<option value="">所有問卷</option>' +
+      surveys.map(s => `<option value="${s.id}">${esc(s.title)}</option>`).join('');
+  } catch(_) {}
+
+  // 從 URL 參數讀篩選
+  const url = new URLSearchParams(location.search);
+  ['survey_id','date_from','date_to'].forEach(k => {
+    const v = url.get(k);
+    if (v) document.getElementById(k).value = v;
+  });
+  const p = parseInt(url.get('page') || '1', 10);
+
+  document.getElementById('filter').addEventListener('submit', e => { e.preventDefault(); goPage(1); });
+  await load(p);
+}
+
+async function load(page) {
+  currentPage = page;
+  const q = new URLSearchParams();
+  ['survey_id','date_from','date_to'].forEach(k => {
+    const v = document.getElementById(k).value;
+    if (v) q.set(k, v);
+  });
+  q.set('page', page);
+  q.set('page_size', PAGE_SIZE);
+
+  document.getElementById('commentsList').innerHTML = `
+    <div class="text-center py-12">
+      <svg class="animate-spin h-8 w-8 mx-auto text-brand-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+      </svg>
+      <p class="mt-3 text-sm text-slate-500">載入中…</p>
+    </div>`;
+
+  try {
+    const data = await API.get('/api/admin/comments?' + q.toString());
+    totalPages = data.total_pages || 1;
+    currentPage = data.page || 1;
+
+    document.getElementById('stats').innerHTML = data.total > 0
+      ? `共 <b class="text-brand-700">${data.total}</b> 筆民眾意見｜目前第 <b>${data.page}</b> / ${totalPages} 頁｜每頁 ${PAGE_SIZE} 筆`
+      : '';
+
+    if (!data.items.length) {
+      document.getElementById('commentsList').innerHTML =
+        '<div class="bg-white border border-slate-200 rounded-xl p-12 text-center text-slate-400">查無民眾意見</div>';
+      document.getElementById('pagination').classList.add('hidden');
+      return;
+    }
+
+    document.getElementById('commentsList').innerHTML = data.items.map((it, idx) => {
+      const date = fmtTpe(it.submitted_at);
+      const seqNum = (data.page - 1) * PAGE_SIZE + idx + 1;
+      return `
+        <div class="bg-white border border-slate-200 rounded-xl p-4 hover:border-brand-300 transition">
+          <div class="flex justify-between items-start gap-2 mb-2">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 text-[11px] text-slate-500 mb-1">
+                <span class="bg-slate-100 px-1.5 py-0.5 rounded">#${seqNum}</span>
+                <span>📍 ${esc(it.location_name || '—')}</span>
+                <span class="text-slate-300">·</span>
+                <span>${esc(it.survey_title || '—')}</span>
+              </div>
+              <div class="text-sm font-bold text-slate-700">${esc(it.question_text)}</div>
+            </div>
+            <span class="text-xs text-slate-400 shrink-0">${esc(date)}</span>
+          </div>
+          <div class="text-slate-800 whitespace-pre-wrap leading-relaxed bg-slate-50 border-l-4 border-brand-400 p-3 rounded-r">${esc(it.answer_text)}</div>
+          <div class="mt-2 text-right">
+            <a href="responses.html?survey_id=${it.survey_id}" class="text-xs text-brand-600 hover:underline">查看填答 #${it.response_id} 完整內容 →</a>
+          </div>
+        </div>`;
+    }).join('');
+
+    document.getElementById('pagination').classList.remove('hidden');
+    document.getElementById('pageInfo').textContent = `第 ${currentPage} / ${totalPages} 頁`;
+    document.getElementById('firstBtn').disabled = currentPage <= 1;
+    document.getElementById('prevBtn').disabled = currentPage <= 1;
+    document.getElementById('nextBtn').disabled = currentPage >= totalPages;
+    document.getElementById('lastBtn').disabled = currentPage >= totalPages;
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (e) {
+    document.getElementById('commentsList').innerHTML =
+      `<div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4">載入失敗：${esc(e.message)}</div>`;
+    document.getElementById('pagination').classList.add('hidden');
+  }
+}
+
+function goPage(p) {
+  if (p < 1) p = 1;
+  if (p > totalPages) p = totalPages;
+  load(p);
+}
+
+init();
+</script>
+</body>
+</html>
