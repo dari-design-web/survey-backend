@@ -147,9 +147,6 @@ async function load(page) {
             <span class="text-xs text-slate-400 shrink-0">${esc(date)}</span>
           </div>
           <div class="text-slate-800 whitespace-pre-wrap leading-relaxed bg-slate-50 border-l-4 border-brand-400 p-3 rounded-r">${esc(it.answer_text)}</div>
-          <div class="mt-2 text-right">
-            <a href="responses.html?survey_id=${it.survey_id}" class="text-xs text-brand-600 hover:underline">查看填答 #${it.response_id} 完整內容 →</a>
-          </div>
         </div>`;
     }).join('');
 
