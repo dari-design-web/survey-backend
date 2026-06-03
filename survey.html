@@ -277,18 +277,37 @@ async function submit(e) {
   const msg = document.getElementById('msg');
   const btn = document.getElementById('submitBtn');
   msg.classList.add('hidden');
-  btn.disabled = true; btn.textContent = '送出中…';
+  btn.disabled = true;
+  btn.textContent = '送出中…';
 
-  const answers = questions
-    .filter(q => q.question_type !== 'section')
-    .map(q => ({ questionId: q.id, value: collectValue(q) }));
+  // 安全網：30 秒後若還沒結果，強制重啟按鈕讓使用者可重試
+  // （即使後面任何環節靜默失敗，按鈕都不會永遠 disabled）
+  const safetyTimer = setTimeout(() => {
+    if (btn.disabled) {
+      btn.disabled = false;
+      btn.textContent = '送出問卷（請再試一次）';
+      msg.textContent = '送出時間過長，請再按一次。如重試多次仍失敗請通知工作人員。';
+      msg.classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, 30000);
+
+  // 提示文字：5 秒後若還在送出中，顯示「伺服器正在喚醒…」
+  const wakingTimer = setTimeout(() => {
+    if (btn.disabled) {
+      btn.textContent = '送出中…（伺服器正在喚醒，請稍候）';
+    }
+  }, 5000);
 
   try {
-    const r = await API.post('/api/public/survey', { surveyId, answers, deviceId: getDeviceId() });
-    if (r.deviceId) localStorage.setItem(DEVICE_KEY, r.deviceId);
+    // === 重點：所有可能拋錯的程式碼都包在 try 內 ===
+    const answers = questions
+      .filter(q => q.question_type !== 'section')
+      .map(q => ({ questionId: q.id, value: collectValue(q) }));
 
-    // 把完整 coupon + survey 暫存到 sessionStorage，success.html 直接讀
-    // 可省掉 success.html 再打一次 API 的延遲
+    const r = await API.post('/api/public/survey', { surveyId, answers, deviceId: getDeviceId() });
+
+    if (r.deviceId) localStorage.setItem(DEVICE_KEY, r.deviceId);
     if (r.coupon && r.survey) {
       try {
         sessionStorage.setItem('coupon_cache_' + (r.coupon.coupon_code || r.coupon.code || ''),
@@ -302,12 +321,34 @@ async function submit(e) {
     if (r.nextDate) qs.set('nextDate', r.nextDate.slice(0, 10));
     location.href = 'success.html?' + qs.toString();
   } catch (e2) {
-    msg.textContent = e2.message;
+    console.error('[submit error]', e2);  // 留 log 方便日後查
+    msg.textContent = '送出失敗：' + (e2 && e2.message ? e2.message : '請稍候再試');
     msg.classList.remove('hidden');
-    btn.disabled = false; btn.textContent = '送出問卷';
+    btn.disabled = false;
+    btn.textContent = '重新送出';
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  } finally {
+    // 不管成敗都清掉計時器
+    clearTimeout(safetyTimer);
+    clearTimeout(wakingTimer);
   }
 }
+
+// 手機背景待機回來時：如果已 > 5 分鐘，提醒重新整理（避免 stale state）
+let _lastHidden = null;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    _lastHidden = Date.now();
+  } else if (_lastHidden && Date.now() - _lastHidden > 5 * 60 * 1000) {
+    const msg = document.getElementById('msg');
+    if (msg) {
+      msg.textContent = '頁面閒置過久，建議重新整理後再送出 — 點此自動重整';
+      msg.classList.remove('hidden');
+      msg.classList.add('cursor-pointer');
+      msg.onclick = () => location.reload();
+    }
+  }
+});
 </script>
 </body>
 </html>
