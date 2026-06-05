@@ -224,8 +224,41 @@ function questionHTML(q) {
           <button onclick="delQ(${qidStr})" class="text-red-600 hover:underline text-xs">刪除</button>
         </div>
       </div>
+
+      ${isSection ? '' : `
+      <div class="mt-3 bg-amber-50/40 border border-amber-200 rounded p-2.5 text-xs" data-cond-row>
+        <div class="font-medium text-amber-900 mb-1.5">
+          🔗 顯示條件 <span class="text-amber-700 font-normal">（選填；預設一律顯示）</span>
+        </div>
+        <div class="flex flex-wrap items-center gap-1.5 text-xs">
+          <span class="text-slate-600">本題僅在</span>
+          <select data-f="cond_q" class="border border-slate-300 rounded px-1.5 py-1 max-w-[260px]">
+            <option value="">— 不設條件 —</option>
+            ${condQuestionOptions(q.id, q.display_condition?.depends_on)}
+          </select>
+          <span class="text-slate-600">的答案 =</span>
+          <input data-f="cond_v" type="text"
+            value="${esc((q.display_condition?.show_when || []).join(','))}"
+            placeholder="如：有使用（多值用逗號分隔）"
+            class="border border-slate-300 rounded px-1.5 py-1 flex-1 min-w-[140px]">
+          <span class="text-slate-600">時才顯示</span>
+        </div>
+      </div>
+      `}
       </div>
     </div>`;
+}
+
+// 產生「依賴題目」的下拉選項（排除自己 + 章節）
+function condQuestionOptions(currentQid, selectedDepId) {
+  return _questions
+    .filter(q => q.id !== currentQid && q.question_type !== 'section')
+    .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+    .map(q => {
+      const short = (q.question_text || '').split('\n')[0].slice(0, 30);
+      const sel = (String(q.id) === String(selectedDepId)) ? 'selected' : '';
+      return `<option value="${q.id}" ${sel}>(順序${q.sort_order||0}) ${esc(short)}</option>`;
+    }).join('');
 }
 
 function renderQs(qs) {
@@ -580,6 +613,18 @@ function _collectBody(qid) {
   if (!root) return null;
   const type = root.querySelector('[data-f="type"]').value;
   const opts = root.querySelector('[data-f="options"]').value.split('\n').map(s=>s.trim()).filter(Boolean);
+
+  // 顯示條件
+  const condQ = root.querySelector('[data-f="cond_q"]')?.value || '';
+  const condV = (root.querySelector('[data-f="cond_v"]')?.value || '').trim();
+  let display_condition = null;
+  if (condQ && condV) {
+    const vals = condV.split(',').map(s => s.trim()).filter(Boolean);
+    if (vals.length) {
+      display_condition = { depends_on: parseInt(condQ), show_when: vals };
+    }
+  }
+
   return {
     question_text: root.querySelector('[data-f="text"]').value,
     question_type: type,
@@ -589,7 +634,8 @@ function _collectBody(qid) {
     is_active: true,
     include_in_statistics: root.querySelector('[data-f="stat"]').checked,
     is_satisfaction_score: root.querySelector('[data-f="sat"]').checked,
-    is_overall_score: root.querySelector('[data-f="overall"]').checked
+    is_overall_score: root.querySelector('[data-f="overall"]').checked,
+    display_condition: display_condition,
   };
 }
 
