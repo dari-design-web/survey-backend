@@ -366,6 +366,12 @@ async function submit(e) {
     if (r.coupon) qs.set('code', r.coupon.coupon_code || r.coupon.code);
     if (r.reason) qs.set('reason', r.reason);
     if (r.nextDate) qs.set('nextDate', r.nextDate.slice(0, 10));
+    // 傳遞感謝頁的「下一步引導」設定
+    if (r.survey?.next_action_url && r.survey?.next_action_label) {
+      qs.set('naUrl', r.survey.next_action_url);
+      qs.set('naLabel', r.survey.next_action_label);
+      if (r.survey.next_action_hint) qs.set('naHint', r.survey.next_action_hint);
+    }
     location.href = 'success.html?' + qs.toString();
   } catch (e2) {
     console.error('[submit error]', e2);  // 留 log 方便日後查

@@ -21,7 +21,27 @@ const q = new URLSearchParams(location.search);
 const code = q.get('code');
 const reason = q.get('reason');
 const nextDate = q.get('nextDate');
+const naUrl = q.get('naUrl') || '';
+const naLabel = q.get('naLabel') || '';
+const naHint = q.get('naHint') || '';
 const root = document.getElementById('root');
+
+// 產生「下一步引導」按鈕 HTML（如果有設定的話）
+function nextActionHTML(surveyObj) {
+  // 優先用 URL 參數,退回 survey 物件
+  const url = naUrl || surveyObj?.next_action_url || '';
+  const label = naLabel || surveyObj?.next_action_label || '';
+  const hint = naHint || surveyObj?.next_action_hint || '';
+  if (!url || !label) return '';
+  return `
+    <div class="mt-6 bg-gradient-to-br from-brand-50 to-cyan-50 border-2 border-brand-300 rounded-2xl p-5 text-center">
+      ${hint ? `<p class="text-sm text-slate-700 mb-3 leading-relaxed">${esc(hint)}</p>` : ''}
+      <a href="${esc(url)}" target="_blank"
+         class="inline-block w-full bg-gradient-to-r from-brand-600 to-cyan-600 hover:opacity-90 text-white font-bold py-3.5 rounded-xl shadow-lg transition transform active:scale-95">
+        ${esc(label)}
+      </a>
+    </div>`;
+}
 
 function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]))}
 
@@ -86,6 +106,7 @@ function readCache(code) {
         <p class="text-slate-700">您已於一個月內兌換過贈品</p>
         ${nextDate ? `<p class="mt-2 text-lg font-bold text-amber-600">下次可兌換日期：${esc(nextDate)}</p>` : ''}
       </div>
+      ${nextActionHTML()}
       <a href="index.html" class="mt-6 block text-center text-sm text-slate-500">返回首頁</a>`;
   } else {
     root.innerHTML = `
@@ -94,6 +115,7 @@ function readCache(code) {
         <h1 class="text-2xl font-bold">問卷已送出</h1>
         <p class="text-sm text-slate-500 mt-3 pre">${esc(DEFAULT_THANKS)}</p>
       </div>
+      ${nextActionHTML()}
       <a href="index.html" class="mt-6 block text-center text-sm text-slate-500">返回首頁</a>`;
   }
 })();
@@ -141,6 +163,8 @@ function renderCoupon(coupon, survey) {
         ${TERMS.map(t => `<li>${esc(t)}</li>`).join('')}
       </ol>
     </div>
+
+    ${nextActionHTML(survey)}
 
     <a href="my-coupons.html" class="mt-5 block w-full text-center bg-white border-2 border-brand-600 text-brand-700 font-bold py-3 rounded-xl">查看我的所有兌換券 →</a>
     <a href="index.html" class="mt-3 block text-center text-sm text-slate-500">返回首頁</a>`;
