@@ -185,15 +185,20 @@ function evaluateAllConditions() {
     const show = _isConditionMet(q);
     if (show) {
       card.style.display = '';
+      // 顯示時解除 disabled,讓 required 驗證重新生效
+      card.querySelectorAll('input,textarea,select').forEach(el => {
+        el.disabled = false;
+      });
     } else {
       card.style.display = 'none';
-      // 隱藏時清掉答案，避免送出時帶 stale 資料
+      // 隱藏時清掉答案 + disabled(讓 required 驗證跳過),避免送出時卡住
       card.querySelectorAll('input').forEach(i => {
         if (i.type === 'radio' || i.type === 'checkbox') i.checked = false;
         else i.value = '';
+        i.disabled = true;
       });
-      card.querySelectorAll('textarea').forEach(t => t.value = '');
-      card.querySelectorAll('select').forEach(s => { s.selectedIndex = 0; });
+      card.querySelectorAll('textarea').forEach(t => { t.value = ''; t.disabled = true; });
+      card.querySelectorAll('select').forEach(s => { s.selectedIndex = 0; s.disabled = true; });
     }
   });
 }
