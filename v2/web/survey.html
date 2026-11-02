@@ -213,7 +213,7 @@ function evaluateAllConditions() {
       <div class="card" style="margin-top:24px">
         <div class="between"><strong>填答進度</strong><span id="progText">0／${total} 題</span></div>
         <div class="progress" role="progressbar" aria-label="填答進度" aria-valuemin="0" aria-valuemax="100" id="progBar"><span style="width:0%"></span></div>
-        <p class="muted">匿名填寫、免登入。標示「必填」的題目請務必回答。</p>
+        <p class="muted">${precheck?.login_required ? '已用 Google 帳號登入（系統不保存您的姓名與 Email）。' : '匿名填寫。'}標示「必填」的題目請務必回答。</p>
       </div>
       <div style="margin-top:16px">${precheckBanner}</div>
       <form id="f" novalidate>
