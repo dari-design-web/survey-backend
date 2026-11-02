@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>送出完成</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="config.js?v=3.2.3"></script>
-<script src="js/common.js?v=3.2.3"></script>
-<script src="js/api.js?v=3.2.3"></script>
+<script src="config.js?v=3.3.0"></script>
+<script src="js/common.js?v=3.3.0"></script>
+<script src="js/api.js?v=3.3.0"></script>
 </head>
 <body>
 <div class="customer-shell">
@@ -83,10 +83,10 @@ function readCache(code) {
   } else if (reason === 'out_of_stock') {
     root.innerHTML = doneHeader('問卷已送出', '感謝您的回饋，您的意見已完整送出。') +
       '<div style="margin-top:24px">' + notice('warning', 'gift', '本期贈品已兌換完畢，本次未產生兌換券。') + '</div>' + nextActionHTML() + links;
-  } else if (reason === 'interval_not_met') {
+  } else if (reason === 'interval_not_met' || reason === 'monthly_limit') {
     root.innerHTML = doneHeader('問卷已送出', '感謝您的回饋，您的意見已完整送出。') +
-      '<div style="margin-top:24px">' + notice('warning', 'clock', '您近期已兌換過本問卷的贈品，本次不再發券。' +
-      (nextDate ? `<br>下次可兌換日期：<strong>${esc(nextDate)}</strong>` : '')) + '</div>' + nextActionHTML() + links;
+      '<div style="margin-top:24px">' + notice('warning', 'clock', '每個帳號每月限領一次贈品，您本月已兌換過，本次不再發券。' +
+      (nextDate ? `<br><strong>${esc(nextDate)}</strong> 起可再領取。` : '')) + '</div>' + nextActionHTML() + links;
   } else {
     root.innerHTML = doneHeader('問卷已送出', '感謝您完成本次滿意度調查！您的意見將作為我們持續改善的重要參考。') + nextActionHTML() + links;
   }
@@ -96,6 +96,7 @@ function renderCoupon(coupon, survey) {
   const thanks = survey?.thank_you_message || DEFAULT_THANKS;
   root.innerHTML = doneHeader('感謝您的回饋！', thanks) +
     '<div style="margin-top:24px">' + ticketHTML(coupon, survey) + '</div>' + termsHTML() + nextActionHTML(survey) + links;
+  loadGiftImages(root);
 }
 </script>
 </body>

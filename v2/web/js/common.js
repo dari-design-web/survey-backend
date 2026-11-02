@@ -7,6 +7,7 @@
     '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap" rel="stylesheet">' +
     '<link rel="stylesheet" href="' + base + 'css/design.css?v=' + V + '">' +
     '<link rel="stylesheet" href="' + base + 'css/theme.css?v=' + V + '">' +
+    '<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"><\/script>' +
     '<script src="' + base + 'js/ui.js?v=' + V + '"><\/script>');
 
   // Tailwind 自訂主題（CDN 模式）：品牌色改為設計系統的墨綠

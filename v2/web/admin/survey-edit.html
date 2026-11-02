@@ -6,9 +6,9 @@
 <title>編輯問卷</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
-<script src="../config.js?v=3.2.3"></script>
-<script src="../js/common.js?v=3.2.3"></script>
-<script src="../js/api.js?v=3.2.3"></script>
+<script src="../config.js?v=3.3.0"></script>
+<script src="../js/common.js?v=3.3.0"></script>
+<script src="../js/api.js?v=3.3.0"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
 <script>renderAdminHeader('surveys');</script>
@@ -35,8 +35,9 @@
         <span class="text-xs text-slate-500 mt-1 block">贈品兌換完要換新款：到「贈品庫存」新增贈品並入庫，再回來這裡切換即可。</span></label>
       <label class="block"><span class="text-slate-700">兌換期限（小時，逾時自動取消並回補庫存）</span>
         <input id="f_validDays" type="number" min="1" value="24" class="mt-1 w-full border rounded px-3 py-2"></label>
-      <label class="block"><span class="text-slate-700">兌換間隔（天）</span>
-        <input id="f_interval" type="number" min="0" value="30" class="mt-1 w-full border rounded px-3 py-2"></label>
+      <div class="block"><span class="text-slate-700">領取限制</span>
+        <p class="mt-1 text-slate-600">每個帳號每月限領一次（跨所有問卷，台灣時間每月 1 日重新計算；逾期未兌換的券不算）。</p>
+        <input id="f_interval" type="hidden" value="30"></div>
       <label class="block md:col-span-2"><span class="text-slate-700">兌換地點說明</span>
         <input id="f_redLoc" class="mt-1 w-full border rounded px-3 py-2"></label>
       <label class="block"><span class="text-slate-700">兌換券標題</span>

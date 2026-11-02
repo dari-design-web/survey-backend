@@ -11,7 +11,7 @@
  * 版本：見 CODE_VERSION。原始碼來源：GitHub dari-design-web/survey-backend /v2/gas/
  */
 
-var CODE_VERSION = '3.2.2';
+var CODE_VERSION = '3.3.0';
 var GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/dari-design-web/survey-backend/main/v2/gas/';
 var TZ = 'Asia/Taipei';
 var JWT_TTL_HOURS = 8;
@@ -53,7 +53,7 @@ var SCHEMA = {
     voided_at: 's', voided_by: 'n'
   },
   gifts: {
-    id: 'n', name: 's', description: 's', is_active: 'n', low_stock_alert: 'n',
+    id: 'n', name: 's', description: 's', is_active: 'n', low_stock_alert: 'n', image_version: 's',
     // 以下三欄為「顯示用快照」，真正數字一律由 stock_logs 與 coupons 計算
     on_hand: 'n', reserved: 'n', available: 'n',
     created_at: 's', updated_at: 's'
@@ -74,7 +74,9 @@ var SCHEMA = {
     id: 'n', admin_user_id: 'n', action: 's', target_type: 's', target_id: 's',
     detail: 's', created_at: 's'
   },
-  coupon_sequences: { id: 'n', seq_key: 's', seq: 'n' }
+  coupon_sequences: { id: 'n', seq_key: 's', seq: 'n' },
+  // 贈品圖片（方形 JPEG，前端已縮小）：base64 依 45,000 字元切段存放，避開儲存格上限
+  gift_images: { id: 'n', gift_id: 'n', seq: 'n', data: 's', created_at: 's' }
 };
 
 // ============================================================
@@ -239,7 +241,7 @@ var Store = (function () {
 
   // 問卷、題目、贈品有變動 → 讓公開頁快取失效
   function touch(name) {
-    if (name === 'surveys' || name === 'survey_questions' || name === 'gifts') bumpPublicCache();
+    if (name === 'surveys' || name === 'survey_questions' || name === 'gifts' || name === 'gift_images') bumpPublicCache();
   }
 
   return { all: all, get: get, find: find, findOne: findOne, insert: insert,
@@ -454,27 +456,35 @@ function displayStatus(c, now) {
   return c.status;
 }
 
-function checkEligibility(userId, surveyId, intervalDays) {
+/** 台灣時間下個月 1 日 00:00 */
+function nextMonthStart(now) {
+  var ym = tpeDate(now).slice(0, 7).split('-');
+  var y = Number(ym[0]), m = Number(ym[1]);     // m：1–12
+  return new Date(Date.UTC(m === 12 ? y + 1 : y, m === 12 ? 0 : m, 1, -8, 0, 0));
+}
+
+/**
+ * 領券資格（每個帳號／裝置）：
+ *  1) 手上已有尚未使用、未逾期的券（任何問卷）→ 回傳那張券
+ *  2) 本月（台灣時間自然月）已兌換過任何問卷的贈品 → 下個月 1 日起才能再領
+ *  逾期未兌換或作廢的券不算，可以重新領取。
+ */
+function checkEligibility(userId, surveyId) {
   var now = new Date();
-  var mine = Store.find('coupons', function (c) { return c.user_id === userId && c.survey_id === surveyId; });
+  var mine = Store.find('coupons', function (c) { return c.user_id === userId; });
   if (!mine.length) return { eligible: true };
-  var issued = mine.filter(function (c) { return c.status === 'issued'; })
-    .sort(function (a, b) { return str(b.issued_at) < str(a.issued_at) ? -1 : 1; });
-  for (var i = 0; i < issued.length; i++) {
-    var exp = parseDate(issued[i].expires_at);
-    if (exp && exp > now) {
-      return { eligible: false, reason: 'existing_coupon', message: '您已有一張本問卷的尚未使用兌換券。', existing_coupon: issued[i] };
-    }
+  var valid = mine.filter(function (c) { return displayStatus(c, now) === 'issued'; })
+    .sort(function (a, b) { return (a.survey_id === surveyId ? 0 : 1) - (b.survey_id === surveyId ? 0 : 1) || (str(b.issued_at) < str(a.issued_at) ? -1 : 1); });
+  if (valid.length) {
+    return { eligible: false, reason: 'existing_coupon', message: '您已有一張尚未使用的兌換券。', existing_coupon: valid[0] };
   }
-  var redeemed = mine.filter(function (c) { return c.status === 'redeemed' && c.redeemed_at; })
-    .sort(function (a, b) { return str(b.redeemed_at) < str(a.redeemed_at) ? -1 : 1; });
-  if (redeemed.length) {
-    var nxt = addDays(new Date(redeemed[0].redeemed_at), intervalDays);
-    if (now < nxt) {
-      return { eligible: false, reason: 'interval_not_met',
-        message: '您已於 ' + intervalDays + ' 天內兌換過本問卷的贈品，下次可兌換日期為 ' + tpeDate(nxt) + '。',
-        next_eligible_date: nxt.toISOString() };
-    }
+  var month = tpeDate(now).slice(0, 7);
+  var used = mine.filter(function (c) { return c.status === 'redeemed' && tpeDateOfIso(c.redeemed_at || c.issued_at).slice(0, 7) === month; });
+  if (used.length) {
+    var nxt = nextMonthStart(now);
+    return { eligible: false, reason: 'monthly_limit',
+      message: '每個帳號每月限領一次，您本月已兌換過贈品，' + tpeDate(nxt) + ' 起可再領取。',
+      next_eligible_date: nxt.toISOString() };
   }
   return { eligible: true };
 }
@@ -586,7 +596,7 @@ function publicSurvey(s) {
     coupon_title: s.coupon_title, coupon_subtitle: s.coupon_subtitle,
     redemption_location: s.redemption_location, thank_you_message: s.thank_you_message,
     is_active: s.is_active, generate_coupon: s.generate_coupon,
-    gift_name: g ? g.name : null,
+    gift_name: g ? g.name : null, gift_id: g ? g.id : null, gift_image: g && g.image_version ? g.image_version : null,
     next_action_label: s.next_action_label || '', next_action_url: s.next_action_url || '',
     next_action_hint: s.next_action_hint || ''
   };
@@ -646,16 +656,98 @@ function apiGetCoupon(ctx, m) {
   return { coupon: out, survey: s ? publicSurvey(s) : null };
 }
 
+// ============================================================
+// 填答者身分：啟用 Google 登入後以 Google 帳號辨識；未啟用時沿用裝置識別碼
+// ============================================================
+function googleClientId() { return props().getProperty('GOOGLE_CLIENT_ID') || ''; }
+function loginRequired() { return !!googleClientId(); }
+
+function sha256Hex(text) {
+  return bytesToHex(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text, Utilities.Charset.UTF_8));
+}
+
+function signJwt(payload) {
+  var header = b64url(Utilities.newBlob(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).getBytes());
+  var body = b64url(Utilities.newBlob(JSON.stringify(payload)).getBytes());
+  return header + '.' + body + '.' + b64url(Utilities.computeHmacSha256Signature(header + '.' + body, jwtSecret()));
+}
+
+function readJwt(tok) {
+  if (!tok) return null;
+  var parts = String(tok).split('.');
+  if (parts.length !== 3) return null;
+  if (b64url(Utilities.computeHmacSha256Signature(parts[0] + '.' + parts[1], jwtSecret())) !== parts[2]) return null;
+  try {
+    var p = JSON.parse(b64urlDecode(parts[1]));
+    return p.exp && p.exp >= Math.floor(Date.now() / 1000) ? p : null;
+  } catch (e) { return null; }
+}
+
+/** 客人登入憑證（30 天）：只含系統內部使用者編號 */
+function signCustomer(u) {
+  var now = Math.floor(Date.now() / 1000);
+  return signJwt({ sub: u.id, role: 'customer', iat: now, exp: now + 30 * 86400 });
+}
+
+function customerFromToken(tok) {
+  var p = readJwt(tok);
+  if (!p || p.role !== 'customer') return null;
+  return Store.get('users', p.sub);
+}
+
+/** 依目前模式找出填答者；create=true 時（送出問卷）不存在就建立裝置使用者 */
+function resolveUser(ctx, deviceId, create) {
+  if (loginRequired()) {
+    var u = customerFromToken(ctx.ctoken);
+    if (!u && create) fail(403, '請先登入 Google 帳號再填寫問卷');
+    return u;
+  }
+  if (!deviceId) return null;
+  var found = userByDevice(deviceId);
+  if (found || !create) return found;
+  return Store.insert('users', { external_id: 'device:' + deviceId, name: '匿名民眾', phone: null, email: null, created_at: nowIso() });
+}
+
+function apiPublicConfig() {
+  return { ok: true, login_required: loginRequired(), google_client_id: googleClientId() || null };
+}
+
+/** Google 登入：驗證 ID token，帳號只存「google:」＋ sub 的雜湊，不存姓名與 Email */
+function apiGoogleLogin(ctx) {
+  var cid = googleClientId();
+  if (!cid) fail(400, '尚未啟用 Google 登入');
+  var cred = str((ctx.body || {}).credential);
+  if (!cred || cred.length > 4096) fail(400, '登入資料不完整');
+  var res = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(cred), { muteHttpExceptions: true });
+  if (res.getResponseCode() !== 200) fail(401, 'Google 登入驗證失敗，請再試一次');
+  var p = JSON.parse(res.getContentText());
+  if (p.aud !== cid) fail(401, 'Google 登入驗證失敗（用戶端不符）');
+  if (p.iss !== 'accounts.google.com' && p.iss !== 'https://accounts.google.com') fail(401, 'Google 登入驗證失敗');
+  if (!p.exp || Number(p.exp) * 1000 < Date.now()) fail(401, 'Google 登入已逾時，請重新登入');
+  if (!p.sub) fail(401, 'Google 登入驗證失敗');
+  var key = 'google:' + sha256Hex('google|' + p.sub).slice(0, 40);
+  var u = Store.findOne('users', function (x) { return x.external_id === key; }) ||
+    Store.insert('users', { external_id: key, name: 'Google 使用者', phone: null, email: null, created_at: nowIso() });
+  return { ok: true, ctoken: signCustomer(u) };
+}
+
+function apiSetGoogleClient(ctx) {
+  var cid = str((ctx.body || {}).client_id).trim();
+  if (cid && !/^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$/.test(cid)) fail(400, 'Client ID 格式不正確（應為 xxxx.apps.googleusercontent.com）');
+  if (cid) props().setProperty('GOOGLE_CLIENT_ID', cid); else props().deleteProperty('GOOGLE_CLIENT_ID');
+  bumpPublicCache();
+  audit(ctx, 'set_google_client', 'system', null, { enabled: !!cid });
+  return { ok: true, login_required: !!cid };
+}
+
 function userByDevice(deviceId) {
   if (!deviceId) return null;
   return Store.findOne('users', function (x) { return x.external_id === 'device:' + deviceId; });
 }
 
 function apiMyCoupons(ctx) {
-  var did = ctx.query.deviceId;
-  if (!did) return { ok: true, coupons: [], message: 'no device' };
-  var u = userByDevice(did);
-  if (!u) return { ok: true, coupons: [] };
+  var u = resolveUser(ctx, ctx.query.deviceId, false);
+  if (!u) return { ok: true, coupons: [], need_login: loginRequired() };
   var now = new Date();
   var cutoff = addDays(now, -30);
   var surveys = {};
@@ -671,7 +763,7 @@ function apiMyCoupons(ctx) {
       id: c.id, coupon_code: c.coupon_code, qr_code_value: c.qr_code_value, status: st,
       issued_at: c.issued_at, expires_at: c.expires_at, redeemed_at: c.redeemed_at,
       survey_id: c.survey_id, survey_title: s.title, location_name: s.location_name,
-      coupon_title: s.coupon_title, redemption_location: s.redemption_location, gift_name: c.gift_name
+      coupon_title: s.coupon_title, redemption_location: s.redemption_location, gift_name: c.gift_name, gift_id: c.gift_id
     };
   }).filter(Boolean);
   keep.sort(function (a, b) { return (order[a.status] - order[b.status]) || (b.id - a.id); });
@@ -684,10 +776,10 @@ function apiPrecheck(ctx, m) {
   if (st !== 'open') fail(404, CLOSED_MSG[st]);
   if (!s.generate_coupon) return { ok: true, eligible: true, generate_coupon: false };
   var stockOk = giftAvailableForSurvey(s).ok;
-  var u = userByDevice(ctx.query.deviceId);
-  var out = { ok: true, generate_coupon: true };
+  var u = resolveUser(ctx, ctx.query.deviceId, false);
+  var out = { ok: true, generate_coupon: true, login_required: loginRequired() };
   if (u) {
-    var r = checkEligibility(u.id, s.id, intervalDays(s));
+    var r = checkEligibility(u.id, s.id);
     if (!r.eligible) {
       out.eligible = false; out.reason = r.reason; out.message = r.message;
       if (r.next_eligible_date) out.nextDate = tpeDate(new Date(r.next_eligible_date));
@@ -701,6 +793,7 @@ function apiPrecheck(ctx, m) {
     return out;
   }
   out.eligible = u ? true : 'new';
+  if (loginRequired() && !u) out.need_login = true;
   return out;
 }
 
@@ -796,7 +889,8 @@ function apiSubmitSurvey(ctx) {
   // 重送去重：同一 clientSubmitId 回傳第一次的結果
   var deviceId = str(b.deviceId).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
   if (!deviceId) deviceId = Utilities.getUuid().replace(/-/g, '');
-  var existingUser = userByDevice(deviceId);
+  var existingUser = resolveUser(ctx, deviceId, false);
+  if (loginRequired() && !existingUser) fail(403, '請先登入 Google 帳號再填寫問卷');
 
   // 去重只在「同一問卷＋同一裝置＋同一送出編號」時成立；其他裝置重用編號視為另一筆
   var dup = null;
@@ -811,9 +905,7 @@ function apiSubmitSurvey(ctx) {
 
   var rows = validateAnswers(s, b.answers);
 
-  var u = existingUser || Store.insert('users', {
-    external_id: 'device:' + deviceId, name: '匿名民眾', phone: null, email: null, created_at: nowIso()
-  });
+  var u = existingUser || resolveUser(ctx, deviceId, true);
 
   var now = nowIso();
   var resp;
@@ -831,9 +923,9 @@ function apiSubmitSurvey(ctx) {
     r.response_id = resp.id; r.created_at = now; return r;
   }));
 
-  var payload = { ok: true, message: '問卷送出成功，感謝您的回饋！', deviceId: deviceId, survey: publicSurvey(s) };
+  var payload = { ok: true, message: '問卷送出成功，感謝您的回饋！', deviceId: loginRequired() ? null : deviceId, survey: publicSurvey(s) };
   if (s.generate_coupon) {
-    var el = checkEligibility(u.id, s.id, intervalDays(s));
+    var el = checkEligibility(u.id, s.id);
     var already = Store.findOne('coupons', function (x) { return x.response_id === resp.id; });
     if (already) {
       payload.message = '問卷送出成功，兌換券已產生！';
@@ -852,7 +944,7 @@ function apiSubmitSurvey(ctx) {
       payload.message = '問卷送出成功，您已有一張未使用的兌換券。';
       payload.coupon = el.existing_coupon;
     } else {
-      payload.reason = 'interval_not_met';
+      payload.reason = el.reason;
       payload.message = el.message;
       payload.nextDate = el.next_eligible_date || '';
     }
@@ -1204,7 +1296,7 @@ function apiRedeemLookup(ctx) {
   }).sort(function (a, b) { return str(b.redeemed_at) < str(a.redeemed_at) ? -1 : 1; })[0];
   var nxt = lastSame ? addDays(new Date(lastSame.redeemed_at), interval) : null;
   return { ok: true, coupon: {
-    id: c.id, code: c.coupon_code, status: displayStatus(c), survey_title: s.title, gift_name: c.gift_name,
+    id: c.id, code: c.coupon_code, status: displayStatus(c), survey_title: s.title, gift_name: c.gift_name, gift_id: c.gift_id,
     user: { name: u.name, phone: u.phone, email: u.email },
     issued_at: c.issued_at, expires_at: c.expires_at, redeemed_at: c.redeemed_at,
     lastRedeemedBeforeThis: prev.length ? prev[0].redeemed_at : null,
@@ -1291,6 +1383,43 @@ function apiGiftStock(ctx, m) {
   refreshGiftSnapshot(id);
   audit(ctx, 'gift_stock_' + b.action, 'gift', id, { qty: qty, delta: delta, note: note });
   return { ok: true, gift: giftRow(Store.get('gifts', id)) };
+}
+
+function apiGiftImageUpload(ctx, m) {
+  var id = Number(m[1]);
+  if (!Store.get('gifts', id)) fail(404, 'not_found');
+  var data = str((ctx.body || {}).data_url);
+  if (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(data)) fail(400, '圖片格式不正確（請上傳 JPG、PNG 或 WebP）');
+  if (data.length > 120000) fail(400, '圖片太大，請重新選擇（系統會自動縮小，若仍失敗請換一張）');
+  removeGiftImage(id);
+  var chunks = [];
+  for (var i = 0; i < data.length; i += 45000) chunks.push({ gift_id: id, seq: chunks.length, data: data.slice(i, i + 45000), created_at: nowIso() });
+  Store.insertMany('gift_images', chunks);
+  Store.update('gifts', id, { image_version: String(Date.now()), updated_at: nowIso() });
+  audit(ctx, 'gift_image_upload', 'gift', id, { bytes: data.length });
+  return { ok: true, gift: giftRow(Store.get('gifts', id)) };
+}
+
+function removeGiftImage(id) {
+  Store.find('gift_images', function (x) { return x.gift_id === id; }).map(function (x) { return x.id; })
+    .forEach(function (rid) { Store.remove('gift_images', rid); });
+}
+
+function apiGiftImageDelete(ctx, m) {
+  var id = Number(m[1]);
+  if (!Store.get('gifts', id)) fail(404, 'not_found');
+  removeGiftImage(id);
+  Store.update('gifts', id, { image_version: null, updated_at: nowIso() });
+  audit(ctx, 'gift_image_delete', 'gift', id);
+  return { ok: true };
+}
+
+function apiGiftImage(ctx, m) {
+  var id = Number(m[1]);
+  var parts = Store.find('gift_images', function (x) { return x.gift_id === id; }).sort(function (a, b) { return a.seq - b.seq; });
+  if (!parts.length) fail(404, 'not_found');
+  var g = Store.get('gifts', id) || {};
+  return { ok: true, data_url: parts.map(function (p) { return p.data; }).join(''), version: g.image_version || null };
 }
 
 var STOCK_ACTION_ZH = { receive: '入庫', loss: '耗損', count: '盤點調整', redeem: '核銷出庫', reconcile: '系統補登' };
@@ -1678,7 +1807,7 @@ function handleExport(ctx, m) {
 // 系統：版本、自動更新（從 GitHub 拉最新已測試版本）
 // ============================================================
 function apiSystemInfo() {
-  return { ok: true, version: CODE_VERSION, auto_update: props().getProperty('AUTO_UPDATE') !== 'off',
+  return { ok: true, version: CODE_VERSION, google_client_id: googleClientId() || null, auto_update: props().getProperty('AUTO_UPDATE') !== 'off',
     last_update: props().getProperty('LAST_UPDATE') || null, last_update_error: props().getProperty('LAST_UPDATE_ERROR') || null };
 }
 
@@ -1869,6 +1998,9 @@ var ROUTES = [
   ['GET', /^\/api\/public\/my-coupons$/, apiMyCoupons, null, false],
   ['GET', /^\/api\/public\/precheck\/(\d+)$/, apiPrecheck, null, false],
   ['POST', /^\/api\/public\/survey$/, apiSubmitSurvey, null, true],
+  ['GET', /^\/api\/public\/config$/, apiPublicConfig, null, false, true],
+  ['POST', /^\/api\/public\/login\/google$/, apiGoogleLogin, null, true],
+  ['GET', /^\/api\/public\/gift-image\/(\d+)$/, apiGiftImage, null, false, true],
   ['POST', /^\/api\/auth\/login$/, apiLogin, null, true],
   ['GET', /^\/api\/auth\/me$/, function (ctx) { return { user: ctx.user }; }, ROLES_ALL, false],
 
@@ -1892,6 +2024,9 @@ var ROUTES = [
   ['PUT', /^\/api\/admin\/gifts\/(\d+)$/, apiUpdateGift, ROLES_MGR, true],
   ['POST', /^\/api\/admin\/gifts\/(\d+)\/stock$/, apiGiftStock, ROLES_MGR, true],
   ['GET', /^\/api\/admin\/gifts\/(\d+)\/logs$/, apiGiftLogs, ROLES_MGR, false],
+  ['POST', /^\/api\/admin\/gifts\/(\d+)\/image$/, apiGiftImageUpload, ROLES_MGR, true],
+  ['DELETE', /^\/api\/admin\/gifts\/(\d+)\/image$/, apiGiftImageDelete, ROLES_MGR, true],
+  ['POST', /^\/api\/admin\/system\/google$/, apiSetGoogleClient, ['super'], true],
   ['GET', /^\/api\/admin\/admin-users$/, apiListAdmins, ['super'], false],
   ['POST', /^\/api\/admin\/admin-users$/, apiCreateAdmin, ['super'], true],
   ['PUT', /^\/api\/admin\/admin-users\/(\d+)$/, apiUpdateAdmin, ['super'], true],
@@ -1932,7 +2067,7 @@ function dispatch(req) {
     if (mm) { pathMatched = true; if (ROUTES[i][0] === method) { route = ROUTES[i]; m = mm; break; } }
   }
   if (!route) return { status: pathMatched ? 405 : 404, body: { error: pathMatched ? 'method_not_allowed' : 'not_found' } };
-  var ctx = { method: method, path: path, query: query, body: req.body || {}, user: null };
+  var ctx = { method: method, path: path, query: query, body: req.body || {}, user: null, ctoken: req.ctoken || null };
   if (route[3]) {
     ctx.user = verifyToken(req.token || query.token);
     if (!ctx.user) return { status: 401, body: { error: 'Unauthorized' } };

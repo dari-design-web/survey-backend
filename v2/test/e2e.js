@@ -40,6 +40,9 @@ function check(name, cond, extra) { results.push([name, !!cond]); console.log((c
   await ctx.route(/cdn\.tailwindcss\.com/, r => r.fulfill({ status: 200, contentType: 'application/javascript',
     body: 'window.tailwind={};document.head.insertAdjacentHTML("beforeend","<style>.hidden{display:none!important}</style>")' }));
   await ctx.route(/fonts\.googleapis|fonts\.gstatic|api\.qrserver|chart\.googleapis/, r => r.fulfill({ status: 200, body: '' }));
+  await ctx.route(/cdnjs\.cloudflare\.com\/.*qrcode/, r => r.fulfill({ status: 200, contentType: 'application/javascript',
+    body: require('fs').readFileSync(require('path').join(__dirname, 'node_modules/qrcode-generator/qrcode.js'), 'utf8') }));
+  await ctx.route(/accounts\.google\.com/, r => r.fulfill({ status: 200, contentType: 'application/javascript', body: '' }));
   await ctx.route(/cdn\.jsdelivr\.net/, r => {
     const f = Object.keys(libs).find(k => r.request().url().endsWith(k));
     return f ? r.fulfill({ status: 200, contentType: 'application/javascript', body: fs.readFileSync(path.join(NM, libs[f])) }) : r.fulfill({ status: 404, body: '' });
@@ -82,6 +85,7 @@ function check(name, cond, extra) { results.push([name, !!cond]); console.log((c
   const code = (await page.textContent('body')).match(/NA-\d{8}-\d{4}-[0-9A-F]{4}/)[0];
   check('填答送出 → 完成頁顯示兌換券 ' + code, !!code);
   check('兌換券顯示贈品名稱', (await page.innerText('body')).includes('測試贈品'));
+  check('QR Code 於本機產生（SVG）', await page.$('#qrBox svg') !== null);
   await page.screenshot({ path: path.join(__dirname, 'shots/2-success.png'), fullPage: true });
 
   // 2. 我的兌換券
@@ -120,6 +124,10 @@ function check(name, cond, extra) { results.push([name, !!cond]); console.log((c
   await page.waitForSelector('#m_err:has-text("原因")', { timeout: 5000 });
   check('耗損未填原因 → 顯示錯誤', true);
   await page.click('text=取消 >> nth=-1');
+  await page.setInputFiles('#list input[type=file]', path.join(__dirname, 'fixture-gift.png'));
+  await page.waitForSelector('#list img[data-gift-img]', { timeout: 15000 });
+  const giftStored = await page.evaluate(async () => { const r = await API.get('/api/public/gift-image/1'); return r.data_url.length; });
+  check('贈品圖片上傳（自動縮成正方形且 ≤120,000 字元）：' + giftStored, giftStored > 1000 && giftStored <= 120000);
   await page.screenshot({ path: path.join(__dirname, 'shots/3-gifts.png'), fullPage: true });
 
   // 6. 核銷
@@ -149,7 +157,7 @@ function check(name, cond, extra) { results.push([name, !!cond]); console.log((c
     const m = body.match(/.{0,30}(失敗|Error|錯誤：).{0,30}/);
     check(`後台 ${p} 頁無錯誤`, !m, m && m[0].replace(/\s+/g, ' '));
   }
-  check('系統版本顯示', (await page.textContent('#sysInfo')).includes('3.2.2'));
+  check('系統版本顯示', (await page.textContent('#sysInfo')).includes('3.3.0'));
 
   check('頁面無 JavaScript 例外', errors.length === 0, errors.join(' | '));
   await browser.close();

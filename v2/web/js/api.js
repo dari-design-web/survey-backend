@@ -53,7 +53,9 @@ window.API = (function () {
       if (!submitId) submitId = newId();
       body = Object.assign({ clientSubmitId: submitId }, body || {});
     }
-    const res = await send({ method, path, body, token: getToken() || undefined });
+    let ctoken;
+    try { ctoken = localStorage.getItem('survey_ctoken') || undefined; } catch (_) {}
+    const res = await send({ method, path, body, token: getToken() || undefined, ctoken });
     const status = res.status || 500;
     const data = res.body || {};
     if (status === 401) {

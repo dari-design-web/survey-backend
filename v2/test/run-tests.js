@@ -87,19 +87,6 @@ test('同問卷已有有效券 → 回傳既有券，不增加預留', () => {
   assert.strictEqual(pre.reason, 'existing_coupon');
 });
 
-test('核銷後間隔未滿 → 拒絕再次發券（台灣日期）', () => {
-  const c = boot();
-  const a = submit(c, 'devA');
-  const r = api(c.env, 'POST', '/api/redeem', { code: a.body.coupon.coupon_code }, c.T);
-  assert.strictEqual(r.body.status, 'redeemed');
-  const b = submit(c, 'devA');
-  assert.strictEqual(b.body.reason, 'interval_not_met');
-  assert.ok(!b.body.coupon);
-  const pre = api(c.env, 'GET', '/api/public/precheck/' + c.ids.survey_id + '?deviceId=devA').body;
-  assert.strictEqual(pre.reason, 'interval_not_met');
-  assert.ok(/^\d{4}-\d{2}-\d{2}$/.test(pre.nextDate));
-});
-
 test('核銷：庫存 −1、預留 −1；第二次核銷顯示已使用且只扣一次', () => {
   const c = boot();
   const code = submit(c, 'devA').body.coupon.coupon_code;
@@ -350,16 +337,6 @@ test('R2 等鎖期間帳號被停用 → 寫入被拒', () => {
   assert.ok(!c.env.Store.all('gifts').some(g => g.name === '不該建立'));
 });
 
-test('R3 兌換間隔 0 天：核銷後可立即再領', () => {
-  const c = boot();
-  const sv = api(c.env, 'GET', '/api/admin/surveys/' + c.ids.survey_id, null, c.T).body.survey;
-  api(c.env, 'PUT', '/api/admin/surveys/' + sv.id, Object.assign({}, sv, { redemption_interval_days: 0 }), c.T);
-  const cp = submit(c, 'devA').body.coupon;
-  api(c.env, 'POST', '/api/redeem', { code: cp.coupon_code }, c.T);
-  assert.strictEqual(api(c.env, 'GET', '/api/public/precheck/' + sv.id + '?deviceId=devA').body.eligible, true);
-  assert.ok(submit(c, 'devA').body.coupon);
-});
-
 test('R4 條件題循環：儲存時拒絕；資料已循環時送出不當機', () => {
   const c = boot();
   const sid = c.ids.survey_id;
@@ -449,6 +426,102 @@ test('G8-L1 舊格式送出編號（升級前）重試：不多存一筆，且�
   c2.env.Store.reset();
   assert.strictEqual(c2.env.Store.all('survey_responses').length, 1);
   assert.strictEqual(c2.env.Store.all('coupons').length, 1);
+});
+
+console.log('\n每月限領、Google 登入、贈品圖片（3.3.0）');
+test('每月限領：本月兌換過任一問卷 → 拒絕，下個月 1 日起可再領', () => {
+  const c = boot();
+  const cp = submit(c, 'devM').body.coupon;
+  api(c.env, 'POST', '/api/redeem', { code: cp.coupon_code }, c.T);
+  const r = submit(c, 'devM');
+  assert.strictEqual(r.body.reason, 'monthly_limit');
+  assert.ok(!r.body.coupon);
+  const pre = api(c.env, 'GET', '/api/public/precheck/' + c.ids.survey_id + '?deviceId=devM').body;
+  assert.strictEqual(pre.reason, 'monthly_limit');
+  assert.ok(/^\d{4}-\d{2}-01$/.test(pre.nextDate), pre.nextDate);
+  // 另一份問卷也不行（跨問卷）
+  const s2 = api(c.env, 'POST', '/api/admin/surveys', { title: '第二份', is_active: true, generate_coupon: true }, c.T).body.id;
+  const q = api(c.env, 'POST', '/api/admin/surveys/' + s2 + '/questions', { question_text: 'Q', question_type: 'text' }, c.T).body.question;
+  const r2 = api(c.env, 'POST', '/api/public/survey', { surveyId: s2, answers: [{ questionId: q.id, value: 'x' }], deviceId: 'devM', clientSubmitId: 'm2' });
+  assert.strictEqual(r2.body.reason, 'monthly_limit');
+  // 上個月兌換的不影響本月
+  c.env.Store.reset();
+  c.env.Store.update('coupons', cp.id, { redeemed_at: new Date(Date.now() - 40 * 86400000).toISOString() });
+  assert.ok(submit(c, 'devM').body.coupon);
+});
+
+test('每月限領：逾期未兌換的券不算，可重新領取；有效券跨問卷也會回傳', () => {
+  const c = boot();
+  const cp = submit(c, 'devE').body.coupon;
+  const s2 = api(c.env, 'POST', '/api/admin/surveys', { title: '第二份', is_active: true, generate_coupon: true }, c.T).body.id;
+  const q = api(c.env, 'POST', '/api/admin/surveys/' + s2 + '/questions', { question_text: 'Q', question_type: 'text' }, c.T).body.question;
+  const r2 = api(c.env, 'POST', '/api/public/survey', { surveyId: s2, answers: [{ questionId: q.id, value: 'x' }], deviceId: 'devE', clientSubmitId: 'e2' });
+  assert.strictEqual(r2.body.reason, 'existing_coupon');
+  c.env.Store.reset();
+  c.env.Store.update('coupons', cp.id, { expires_at: new Date(Date.now() - 1000).toISOString() });
+  assert.ok(submit(c, 'devE').body.coupon);
+});
+
+function googleEnv(sub) {
+  const { createEnv } = require('./gas-mock');
+  let currentSub = sub;
+  const env = createEnv({ UrlFetchApp: { fetch(url) {
+    if (url.indexOf('tokeninfo') >= 0) {
+      const tok = decodeURIComponent(url.split('id_token=')[1]);
+      if (tok === 'bad') return { getResponseCode: () => 400, getContentText: () => '{}' };
+      return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ aud: '123-abc.apps.googleusercontent.com', iss: 'https://accounts.google.com', exp: String(Math.floor(Date.now() / 1000) + 600), sub: tok }) };
+    }
+    throw new Error('no network');
+  } } });
+  const pw = env.setup().match(/密碼：(\S+)/)[1];
+  const ids = env.seedDemo();
+  const T = env.dispatch({ method: 'POST', path: '/api/auth/login', body: { email: 'dari25420001@gmail.com', password: pw } }).body.token;
+  return { env, T, ids };
+}
+
+test('Google 登入：啟用後未登入不能送出；登入後依帳號限領，換裝置無效', () => {
+  const g = googleEnv();
+  const set = g.env.dispatch({ method: 'POST', path: '/api/admin/system/google', body: { client_id: '123-abc.apps.googleusercontent.com' }, token: g.T });
+  assert.strictEqual(set.status, 200, JSON.stringify(set.body));
+  const cfg = g.env.dispatch({ method: 'GET', path: '/api/public/config' }).body;
+  assert.strictEqual(cfg.login_required, true);
+  const qs = g.env.dispatch({ method: 'GET', path: '/api/public/surveys/' + g.ids.survey_id }).body.questions;
+  const ctx = { env: g.env, ids: g.ids, questions: qs };
+  assert.strictEqual(submit(ctx, 'dev1').status, 403);
+  assert.strictEqual(g.env.dispatch({ method: 'POST', path: '/api/public/login/google', body: { credential: 'bad' } }).status, 401);
+  const ct = g.env.dispatch({ method: 'POST', path: '/api/public/login/google', body: { credential: 'user-sub-1' } }).body.ctoken;
+  assert.ok(ct);
+  const send = (dev, extra) => g.env.dispatch({ method: 'POST', path: '/api/public/survey', ctoken: ct,
+    body: Object.assign({ surveyId: g.ids.survey_id, answers: fullAnswers(qs), deviceId: dev, clientSubmitId: 'g' + Math.random() }, extra || {}) });
+  const a = send('dev1');
+  assert.ok(a.body.coupon, JSON.stringify(a.body));
+  assert.strictEqual(a.body.deviceId, null);
+  g.env.dispatch({ method: 'POST', path: '/api/redeem', body: { code: a.body.coupon.coupon_code }, token: g.T });
+  assert.strictEqual(send('another-phone').body.reason, 'monthly_limit');   // 換裝置也一樣
+  // 同一 Google 帳號重新登入 → 同一使用者
+  const ct2 = g.env.dispatch({ method: 'POST', path: '/api/public/login/google', body: { credential: 'user-sub-1' } }).body.ctoken;
+  const mine = g.env.dispatch({ method: 'GET', path: '/api/public/my-coupons', ctoken: ct2 }).body.coupons;
+  assert.strictEqual(mine.length, 1);
+  // 帳號只存雜湊，不存原始 sub
+  g.env.Store.reset();
+  assert.ok(g.env.Store.all('users').every(u => !String(u.external_id).includes('user-sub-1')));
+});
+
+test('贈品圖片：上傳、分段儲存、公開讀取、格式與大小檢查、刪除', () => {
+  const c = boot();
+  const gid = c.ids.gift_id;
+  const big = 'data:image/jpeg;base64,' + 'A'.repeat(100000);
+  const up = api(c.env, 'POST', '/api/admin/gifts/' + gid + '/image', { data_url: big }, c.T);
+  assert.strictEqual(up.status, 200, JSON.stringify(up.body));
+  c.env.Store.reset();
+  assert.strictEqual(c.env.Store.all('gift_images').length, 3);
+  const pub = api(c.env, 'GET', '/api/public/gift-image/' + gid).body;
+  assert.strictEqual(pub.data_url, big);
+  assert.ok(api(c.env, 'GET', '/api/public/surveys/' + c.ids.survey_id).body.survey.gift_image);
+  assert.strictEqual(api(c.env, 'POST', '/api/admin/gifts/' + gid + '/image', { data_url: 'javascript:alert(1)' }, c.T).status, 400);
+  assert.strictEqual(api(c.env, 'POST', '/api/admin/gifts/' + gid + '/image', { data_url: 'data:image/jpeg;base64,' + 'A'.repeat(130000) }, c.T).status, 400);
+  api(c.env, 'DELETE', '/api/admin/gifts/' + gid + '/image', null, c.T);
+  assert.strictEqual(api(c.env, 'GET', '/api/public/gift-image/' + gid).status, 404);
 });
 
 console.log('\n後台與匯出');

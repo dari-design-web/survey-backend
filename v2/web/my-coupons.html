@@ -5,16 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>我的兌換券</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="config.js?v=3.2.3"></script>
-<script src="js/common.js?v=3.2.3"></script>
-<script src="js/api.js?v=3.2.3"></script>
+<script src="config.js?v=3.3.0"></script>
+<script src="js/common.js?v=3.3.0"></script>
+<script src="js/api.js?v=3.3.0"></script>
 </head>
 <body>
 <div class="customer-shell">
   <script>document.write(brandHeader())</script>
   <main id="main" class="customer-main">
     <header><p class="eyebrow">兌換券</p><h1 class="serif" style="margin-top:12px">我的兌換券</h1>
-      <p class="muted" style="margin-top:12px">顯示此裝置的紀錄。超過 30 天的已兌換、已逾期紀錄不再顯示。</p></header>
+      <p class="muted" style="margin-top:12px">顯示您帳號（或此裝置）的紀錄。每個帳號每月限領一次贈品。超過 30 天的已兌換、已逾期紀錄不再顯示。</p></header>
     <div id="filterBar" class="filter-tabs hidden" role="group" aria-label="篩選兌換券" style="margin-top:20px">
       <button type="button" class="filter-tab" data-filter="all" onclick="filterTo('all')">全部</button>
       <button type="button" class="filter-tab" data-filter="issued" onclick="filterTo('issued')">未兌換</button>
@@ -22,6 +22,7 @@
       <button type="button" class="filter-tab" data-filter="expired" onclick="filterTo('expired')">已逾期／作廢</button>
     </div>
     <div id="root" class="stack" style="margin-top:16px"><p class="muted">載入中…</p></div>
+    <div id="logoutBox" style="margin-top:16px"></div>
     <div style="margin-top:32px"><script>document.write(notice('', 'info', '本系統採匿名方式，只以此裝置的識別碼對應您的兌換券；換手機或清除瀏覽器資料後將無法查看。'))</script></div>
   </main>
   <script>document.write(bottomNav('coupons'))</script>
@@ -34,9 +35,13 @@ let _allCoupons = [], _currentFilter = 'all';
 async function load() {
   const did = getDeviceId();
   const root = document.getElementById('root');
-  if (!did) { root.innerHTML = renderEmpty('尚無兌換券', '完成問卷後，兌換券會顯示在這裡。'); return; }
   try {
+    const cfg = await publicConfig();
+    if (cfg.login_required && !getCustomerToken()) { renderGoogleLogin(root, '登入 Google 帳號即可查看您的兌換券。'); return; }
+    if (!cfg.login_required && !did) { root.innerHTML = renderEmpty('尚無兌換券', '完成問卷後，兌換券會顯示在這裡。'); return; }
     const r = await API.get('/api/public/my-coupons?deviceId=' + encodeURIComponent(did));
+    if (r.need_login) { setCustomerToken(null); renderGoogleLogin(root, '登入已過期，請重新登入 Google 帳號。'); return; }
+    if (cfg.login_required) document.getElementById('logoutBox').innerHTML = `<button type="button" class="btn btn-plain" onclick="customerLogout()">登出 Google 帳號</button>`;
     _allCoupons = r.coupons || [];
     document.getElementById('filterBar').classList.toggle('hidden', !_allCoupons.length);
     if (!_allCoupons.length) root.innerHTML = renderEmpty('您目前沒有兌換券', '完成問卷後，兌換券會顯示在這裡。');
@@ -52,6 +57,7 @@ function filterTo(filter) {
   const list = filter === 'all' ? _allCoupons : _allCoupons.filter(c =>
     filter === 'expired' ? (c.status === 'expired' || c.status === 'voided') : c.status === filter);
   document.getElementById('root').innerHTML = list.length ? list.map(renderCard).join('') : '<p class="muted">此分類沒有兌換券。</p>';
+  loadGiftImages(document.getElementById('root'));
 }
 
 function renderCard(c) {

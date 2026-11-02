@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>填寫問卷</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="config.js?v=3.2.3"></script>
-<script src="js/common.js?v=3.2.3"></script>
-<script src="js/api.js?v=3.2.3"></script>
+<script src="config.js?v=3.3.0"></script>
+<script src="js/common.js?v=3.3.0"></script>
+<script src="js/api.js?v=3.3.0"></script>
 <style>.qtext{white-space:pre-line}.other-input{flex:1;min-width:0;border:0;border-bottom:1px solid var(--edge);padding:4px 8px;background:transparent}.submit-bar{position:sticky;bottom:0;background:var(--paper);padding:16px 0;border-top:1px solid var(--line);margin-top:28px;z-index:10}</style>
 </head>
 <body>
@@ -174,8 +174,8 @@ function evaluateAllConditions() {
     // 如果預檢顯示不能領券，先給警告（民眾仍可填，但會看到提示）
     let precheckBanner = '';
     if (precheck?.ok && precheck.eligible === false) {
-      if (precheck.reason === 'interval_not_met') {
-        precheckBanner = notice('warning', 'clock', `<strong>您近期已兌換過本問卷的贈品</strong><br>仍歡迎填寫分享意見，本次不會產生兌換券。${precheck.nextDate ? `<br>下次可兌換日期：<strong>${esc(precheck.nextDate)}</strong>` : ''}`);
+      if (precheck.reason === 'monthly_limit' || precheck.reason === 'interval_not_met') {
+        precheckBanner = notice('warning', 'clock', `<strong>每個帳號每月限領一次贈品，您本月已兌換過</strong><br>仍歡迎填寫分享意見，本次不會產生兌換券。${precheck.nextDate ? `<br>${esc(precheck.nextDate)} 起可再領取。` : ''}`);
       } else if (precheck.reason === 'out_of_stock') {
         precheckBanner = notice('warning', 'gift', '<strong>本期贈品已兌換完畢</strong><br>仍可填答，本次不發兌換券。');
       } else if (precheck.reason === 'existing_coupon' && precheck.existingCouponCode) {
@@ -193,6 +193,14 @@ function evaluateAllConditions() {
       return { html: renderQuestion(q, n) };
     });
 
+    // 啟用 Google 登入時：未登入先顯示登入卡，不顯示題目
+    if (precheck?.ok && precheck.need_login) {
+      root.innerHTML = `<header style="margin-top:20px">
+        ${survey.location_name ? `<p class="eyebrow">${esc(survey.location_name)}</p>` : ''}
+        <h1 class="serif" style="margin:12px 0">${esc(survey.title)}</h1></header><div id="loginBox"></div>`;
+      renderGoogleLogin(document.getElementById('loginBox'));
+      return;
+    }
     const total = questions.filter(q => q.question_type !== 'section').length;
     root.innerHTML = `
       <header style="margin-top:20px">
@@ -200,6 +208,8 @@ function evaluateAllConditions() {
         <h1 class="serif" style="margin:12px 0">${esc(survey.title)}</h1>
         ${survey.description ? `<p class="muted qtext">${esc(survey.description)}</p>` : ''}
       </header>
+      ${survey.generate_coupon && survey.gift_name ? `<div class="gift-strip">${survey.gift_image ? giftImgTag(survey.gift_id, survey.gift_image, 64) : icon('gift', 28)}
+        <div><strong>完成後可領取：${esc(survey.gift_name)}</strong><p>每個帳號每月限領一次，數量有限</p></div></div>` : ''}
       <div class="card" style="margin-top:24px">
         <div class="between"><strong>填答進度</strong><span id="progText">0／${total} 題</span></div>
         <div class="progress" role="progressbar" aria-label="填答進度" aria-valuemin="0" aria-valuemax="100" id="progBar"><span style="width:0%"></span></div>
@@ -224,6 +234,7 @@ function evaluateAllConditions() {
     // 首次評估（隱藏條件未滿足的題目）
     evaluateAllConditions();
     updateProgress();
+    loadGiftImages(root);
   } catch (e) {
     root.innerHTML = '<div style="margin-top:24px">' + notice('error', 'alert', '無法載入問卷：' + esc(e.message), 'alert') + '</div>';
   }
@@ -354,6 +365,7 @@ async function submit(e) {
     location.href = 'success.html?' + qs.toString();
   } catch (e2) {
     console.error('[submit error]', e2);  // 留 log 方便日後查
+    if (e2 && /請先登入/.test(e2.message)) { setCustomerToken(null); location.reload(); return; }
     showMsg('送出失敗：' + (e2 && e2.message ? e2.message : '請稍候再試'));
     btn.disabled = false;
     btn.textContent = '重新送出';

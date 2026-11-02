@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>兌換券核銷</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="../config.js?v=3.2.3"></script>
-<script src="../js/common.js?v=3.2.3"></script>
-<script src="../js/api.js?v=3.2.3"></script>
+<script src="../config.js?v=3.3.0"></script>
+<script src="../js/common.js?v=3.3.0"></script>
+<script src="../js/api.js?v=3.3.0"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
@@ -64,6 +64,7 @@ function render(d, c) {
     <dl class="meta-list">
       <div><dt>券號</dt><dd class="mono">${esc(co.code)}</dd></div>
       ${co.gift_name ? `<div><dt>贈品</dt><dd><strong>${esc(co.gift_name)} × 1</strong></dd></div>` : ''}
+      ${co.gift_id ? `<div style="justify-content:center">${giftImgTag(co.gift_id, 'lookup', 120)}</div>` : ''}
       <div><dt>問卷</dt><dd>${esc(co.survey_title || '—')}</dd></div>
       <div><dt>取得時間</dt><dd>${esc(fmtTpe(co.issued_at, 'short'))}</dd></div>
       <div><dt>兌換期限</dt><dd>${esc(fmtTpe(co.expires_at, 'short'))}</dd></div>
@@ -71,6 +72,7 @@ function render(d, c) {
     ${canRedeem ? `<button id="confirmBtn" type="button" class="btn btn-primary primary-action full">確認核銷</button>` : ''}
     <button type="button" class="btn btn-plain full" style="margin-top:12px" onclick="resetScan()">掃描下一張</button>
   </div>`;
+  loadGiftImages(result);
   const btn = document.getElementById('confirmBtn');
   if (btn) btn.onclick = () => doRedeem(c);
 }

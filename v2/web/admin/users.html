@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>管理者帳號</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="../config.js?v=3.2.3"></script>
-<script src="../js/common.js?v=3.2.3"></script>
-<script src="../js/api.js?v=3.2.3"></script>
+<script src="../config.js?v=3.3.0"></script>
+<script src="../js/common.js?v=3.3.0"></script>
+<script src="../js/api.js?v=3.3.0"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
 <script>renderAdminHeader('users');</script>
@@ -43,6 +43,12 @@
   <div class="bg-white rounded-xl border p-5 mt-6">
     <h2 class="font-bold mb-2">⚙️ 系統版本</h2>
     <div id="sysInfo" class="text-sm text-slate-600">載入中…</div>
+    <div class="mt-4">
+      <label class="field" for="gcid"><span>Google 登入（OAuth 用戶端 ID）</span>
+        <input id="gcid" class="input" placeholder="xxxxxxxx.apps.googleusercontent.com" autocomplete="off"></label>
+      <p class="hint">填入後，客人須以 Google 帳號登入才能填問卷，並依帳號每月限領一次；留空則改用裝置識別碼。</p>
+      <button type="button" onclick="saveGoogle()" class="btn btn-secondary" style="margin-top:8px">儲存 Google 登入設定</button>
+    </div>
     <div class="flex flex-wrap gap-2 mt-3">
       <button onclick="sysUpdate()" class="bg-slate-800 text-white rounded px-3 py-2 text-sm">從 GitHub 檢查並更新後端</button>
       <button onclick="sysReconcile()" class="border rounded px-3 py-2 text-sm">庫存對帳</button>
@@ -91,10 +97,15 @@ load();
 async function sysLoad() {
   try {
     const r = await API.get('/api/admin/system');
-    sysInfo.innerHTML = `後端版本：<b>${r.version}</b>　自動更新：${r.auto_update ? '開啟' : '關閉'}` +
+    gcid.value = r.google_client_id || '';
+    sysInfo.innerHTML = `Google 登入：<b>${r.google_client_id ? '已啟用' : '未啟用（使用裝置識別碼）'}</b><br>後端版本：<b>${r.version}</b>　自動更新：${r.auto_update ? '開啟' : '關閉'}` +
       (r.last_update ? `<br>上次更新：${r.last_update}` : '') +
       (r.last_update_error ? `<br><span class="text-red-600">上次更新錯誤：${r.last_update_error}</span>` : '');
   } catch (e) { sysInfo.textContent = '無法取得：' + e.message; }
+}
+async function saveGoogle() {
+  try { const r = await API.post('/api/admin/system/google', { client_id: gcid.value.trim() }); alert(r.login_required ? '已啟用 Google 登入' : '已停用 Google 登入（改用裝置識別碼）'); sysLoad(); }
+  catch (e) { alert('儲存失敗：' + e.message); }
 }
 async function sysUpdate() {
   try { const r = await API.post('/api/admin/system/update'); alert(r.message); sysLoad(); }

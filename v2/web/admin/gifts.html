@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>贈品庫存</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="../config.js?v=3.2.3"></script>
-<script src="../js/common.js?v=3.2.3"></script>
-<script src="../js/api.js?v=3.2.3"></script>
+<script src="../config.js?v=3.3.0"></script>
+<script src="../js/common.js?v=3.3.0"></script>
+<script src="../js/api.js?v=3.3.0"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
 <script>renderAdminHeader('gifts');</script>
@@ -82,6 +82,15 @@ function render() {
           <button type="button" onclick="toggleActive(${g.id})" class="btn btn-plain">${g.is_active ? '停用' : '啟用'}</button></div>
       </div>
       ${g.description ? `<p class="muted" style="margin-top:8px">${esc(g.description)}</p>` : ''}
+      <div class="row wrap" style="margin-top:16px;align-items:center">
+        ${g.image_version ? giftImgTag(g.id, g.image_version, 96) : `<div style="width:96px;height:96px;border-radius:12px;background:var(--soft);display:flex;align-items:center;justify-content:center;color:var(--muted)">${icon('gift', 32)}</div>`}
+        <div class="stack-sm">
+          <label class="btn btn-secondary" style="cursor:pointer">${g.image_version ? '更換圖片' : '上傳圖片'}
+            <input type="file" accept="image/*" class="sr-only" onchange="uploadImage(${g.id}, this)"></label>
+          ${g.image_version ? `<button type="button" class="btn btn-plain" onclick="removeImage(${g.id})">移除圖片</button>` : ''}
+          <span class="hint" id="imgMsg_${g.id}">任何尺寸的照片都可以：系統會自動裁成正方形 480×480 並壓縮到約 80KB 以下。</span>
+        </div>
+      </div>
       <p class="muted" style="margin-top:8px">使用中的問卷：${g.surveys.length ? g.surveys.map(s => esc(s.title) + (s.is_active ? '' : '（停用）')).join('、') : '無'}</p>
       <div class="stock-grid">
         <div class="stock-stat">實際庫存<strong>${g.on_hand}</strong></div>
@@ -97,6 +106,53 @@ function render() {
       <div id="logs_${g.id}" class="hidden table-scroll" style="margin-top:20px"></div>
     </article>`;
   }).join('');
+  loadGiftImages(box);
+}
+
+// 圖片：裁成置中正方形 → 縮成 480×480 JPEG → 品質由 0.85 往下調到 ≤ 約 80KB
+function resizeSquare(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const side = Math.min(img.naturalWidth, img.naturalHeight);
+      const sx = (img.naturalWidth - side) / 2, sy = (img.naturalHeight - side) / 2;
+      let out = null;
+      for (const size of [480, 400, 320]) {
+        const cv = document.createElement('canvas');
+        cv.width = cv.height = size;
+        const cx = cv.getContext('2d');
+        cx.fillStyle = '#fff'; cx.fillRect(0, 0, size, size);
+        cx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
+        for (let q = 0.85; q >= 0.45; q -= 0.1) {
+          out = cv.toDataURL('image/jpeg', q);
+          if (out.length <= 110000) { URL.revokeObjectURL(url); return resolve(out); }
+        }
+      }
+      URL.revokeObjectURL(url);
+      out && out.length <= 118000 ? resolve(out) : reject(new Error('圖片無法壓縮到上限內，請換一張'));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('無法讀取這個圖片檔')); };
+    img.src = url;
+  });
+}
+
+async function uploadImage(id, input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const msg = document.getElementById('imgMsg_' + id);
+  if (file.size > 20 * 1024 * 1024) { msg.textContent = '原始檔超過 20MB，請換一張'; return; }
+  msg.textContent = '處理中…';
+  try {
+    const dataUrl = await resizeSquare(file);
+    await API.post('/api/admin/gifts/' + id + '/image', { data_url: dataUrl });
+    load();
+  } catch (e) { msg.textContent = '上傳失敗：' + e.message; }
+}
+
+async function removeImage(id) {
+  if (!confirm('確定移除這個贈品的圖片？')) return;
+  try { await API.del('/api/admin/gifts/' + id + '/image'); load(); } catch (e) { alert('移除失敗：' + e.message); }
 }
 
 async function createGift() {

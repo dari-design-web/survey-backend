@@ -57,8 +57,17 @@
     const s = COUPON_STATE[status] || { label: status, cls: 'gray', icon: 'info' };
     return `<span class="badge ${s.cls}">${icon(s.icon, 16)}${s.label}</span>`;
   };
+  // QR Code 在手機上直接產生，券號不會傳給任何外部網站
   window.qrImg = function (text) {
-    return `<img src="https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=0&data=${encodeURIComponent(text)}" alt="兌換券 QR Code" width="212" height="212">`;
+    try {
+      const qr = qrcode(0, 'M');
+      qr.addData(String(text));
+      qr.make();
+      return qr.createSvgTag({ cellSize: 6, margin: 2, scalable: true, alt: '兌換券 QR Code' })
+        .replace('<svg ', '<svg role="img" aria-label="兌換券 QR Code" width="212" height="212" ');
+    } catch (e) {
+      return '<p class="muted" style="text-align:center">QR Code 無法顯示，請改出示下方券號。</p>';
+    }
   };
 })();
 
@@ -74,6 +83,7 @@ window.ticketHTML = function (coupon, survey) {
       <h2>${escHtml((survey && survey.coupon_title) || '贈品兌換券')}</h2>
       <p class="muted">${escHtml((survey && survey.coupon_subtitle) || '感謝您完成滿意度調查')}</p>
       <div style="margin-top:12px">${couponBadge(st)}</div>
+      ${survey && survey.gift_image && survey.gift_id === coupon.gift_id ? `<div style="margin-top:16px;display:flex;justify-content:center">${giftImgTag(coupon.gift_id, survey.gift_image, 120)}</div>` : ''}
     </div>
     ${active
       ? `<div class="qr-box" id="qrBox">${qrImg(coupon.qr_code_value || coupon.coupon_code)}</div>
@@ -102,4 +112,70 @@ window.TERMS = [
 window.termsHTML = function () {
   return `<details class="card" style="margin-top:24px"><summary>兌換注意事項</summary>
     <ol style="margin:8px 0 0;padding-left:1.4em" class="stack-sm">${TERMS.map(t => `<li>${escHtml(t)}</li>`).join('')}</ol></details>`;
+};
+
+
+// ===== 贈品圖片：依版本快取在本機，避免重複下載 =====
+window.giftImgTag = function (giftId, version, size, extraStyle) {
+  if (!giftId || !version) return '';
+  size = size || 96;
+  return `<img data-gift-img="${giftId}" data-ver="${escHtml(version)}" alt="贈品圖片" width="${size}" height="${size}"
+    style="width:${size}px;height:${size}px;object-fit:cover;border-radius:12px;background:var(--soft);flex-shrink:0;${extraStyle || ''}">`;
+};
+window.loadGiftImages = function (root) {
+  (root || document).querySelectorAll('img[data-gift-img]:not([src])').forEach(async img => {
+    const id = img.dataset.giftImg, ver = img.dataset.ver, key = 'giftimg_' + id + '_' + ver;
+    let url = null;
+    try { url = sessionStorage.getItem(key); } catch (_) {}
+    if (!url) {
+      try {
+        url = (await API.get('/api/public/gift-image/' + id)).data_url;
+        try { sessionStorage.setItem(key, url); } catch (_) {}
+      } catch (_) { img.remove(); return; }
+    }
+    img.src = url;
+  });
+};
+
+// ===== 填答者登入（Google）=====
+window.getCustomerToken = function () { try { return localStorage.getItem('survey_ctoken'); } catch (_) { return null; } };
+window.setCustomerToken = function (t) { try { t ? localStorage.setItem('survey_ctoken', t) : localStorage.removeItem('survey_ctoken'); } catch (_) {} };
+window.customerLogout = function () { setCustomerToken(null); location.reload(); };
+
+let _publicConfig = null;
+window.publicConfig = async function () {
+  if (!_publicConfig) _publicConfig = await API.get('/api/public/config');
+  return _publicConfig;
+};
+
+/** 在 container 內顯示「以 Google 帳號登入」卡片；登入成功後重新載入頁面 */
+window.renderGoogleLogin = async function (container, reason) {
+  const cfg = await publicConfig();
+  container.innerHTML = `<div class="card" style="margin-top:24px;text-align:center">
+    <div class="state-symbol">${icon('users', 32)}</div>
+    <h2>請先登入</h2>
+    <p class="muted" style="margin:8px 0 20px">${escHtml(reason || '為確保每個帳號每月限領一次贈品，填寫問卷前請以 Google 帳號登入。')}</p>
+    <div id="gBtn" style="display:flex;justify-content:center;min-height:44px"></div>
+    <p class="muted" style="margin-top:16px">系統只保存帳號的加密識別碼，不保存您的姓名、Email 或照片。</p>
+    <div id="gErr" role="alert" style="color:var(--red);margin-top:12px"></div></div>`;
+  const start = () => {
+    google.accounts.id.initialize({
+      client_id: cfg.google_client_id,
+      callback: async (resp) => {
+        try {
+          const r = await API.post('/api/public/login/google', { credential: resp.credential });
+          setCustomerToken(r.ctoken);
+          location.reload();
+        } catch (e) { document.getElementById('gErr').textContent = '登入失敗：' + e.message; }
+      }
+    });
+    google.accounts.id.renderButton(document.getElementById('gBtn'), { theme: 'outline', size: 'large', text: 'signin_with', shape: 'pill', locale: 'zh-TW' });
+  };
+  if (window.google && google.accounts && google.accounts.id) return start();
+  const sc = document.createElement('script');
+  sc.src = 'https://accounts.google.com/gsi/client';
+  sc.async = true;
+  sc.onload = start;
+  sc.onerror = () => { document.getElementById('gErr').textContent = '無法載入 Google 登入，請確認網路後重新整理。'; };
+  document.head.appendChild(sc);
 };
