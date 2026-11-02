@@ -11,7 +11,7 @@
  * 版本：見 CODE_VERSION。原始碼來源：GitHub dari-design-web/survey-backend /v2/gas/
  */
 
-var CODE_VERSION = '3.2.1';
+var CODE_VERSION = '3.2.2';
 var GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/dari-design-web/survey-backend/main/v2/gas/';
 var TZ = 'Asia/Taipei';
 var JWT_TTL_HOURS = 8;
@@ -802,7 +802,9 @@ function apiSubmitSurvey(ctx) {
   var dup = null;
   if (clientId && existingUser) {
     dup = Store.findOne('survey_responses', function (r) {
-      return r.client_submit_id === clientId + '@' + existingUser.id && r.survey_id === s.id && r.user_id === existingUser.id;
+      // 新格式「編號@使用者」；相容 3.2.0 以前未加後綴的舊格式（仍限同問卷＋同使用者）
+      return (r.client_submit_id === clientId + '@' + existingUser.id || r.client_submit_id === clientId) &&
+        r.survey_id === s.id && r.user_id === existingUser.id;
     });
     if (dup && dup.result) { var res = dup.result; res.duplicate = true; return res; }
   }

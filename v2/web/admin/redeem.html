@@ -5,16 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>兌換券核銷</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="../config.js?v=3.2.2"></script>
-<script src="../js/common.js?v=3.2.2"></script>
-<script src="../js/api.js?v=3.2.2"></script>
+<script src="../config.js?v=3.2.3"></script>
+<script src="../js/common.js?v=3.2.3"></script>
+<script src="../js/api.js?v=3.2.3"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
 <script>renderAdminHeader('redeem');</script>
 <main class="admin-main" style="max-width:560px">
   <header><p class="eyebrow">現場核銷</p><h1 style="margin-top:8px">掃描兌換券</h1>
-    <p class="muted" style="margin-top:8px">掃描客人手機上的 QR Code，或手動輸入券號。</p></header>
+    <p class="muted" style="margin-top:8px">掃描客人手機上的 QR Code，或手動輸入券號。看到「核銷成功」才交付贈品。</p>
+    <a class="link" href="guide.html" target="_blank" rel="noopener">櫃台核銷操作單（可列印）</a></header>
   <div class="card stack-sm">
     <button id="scanBtn" type="button" class="btn btn-primary primary-action full"></button>
     <video id="video" class="hidden" playsinline style="width:100%;border-radius:16px;background:var(--ink)"></video>

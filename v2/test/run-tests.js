@@ -426,6 +426,31 @@ test('R6b 改題名後匯出：欄名附上曾用題名', () => {
   assert.ok(csv.includes('全新的題目文字［曾用題名：' + q.question_text + '］'), csv.split('\n')[0].slice(0, 300));
 });
 
+test('G8-L1 舊格式送出編號（升級前）重試：不多存一筆，且仍限同裝置', () => {
+  const c = boot();
+  const a = submit(c, 'devOld', { clientSubmitId: 'legacy-1' });
+  c.env.Store.reset();
+  const r = c.env.Store.all('survey_responses')[0];
+  c.env.Store.update('survey_responses', r.id, { client_submit_id: 'legacy-1' });   // 模擬舊版格式
+  const b = submit(c, 'devOld', { clientSubmitId: 'legacy-1' });
+  assert.strictEqual(b.body.duplicate, true);
+  assert.strictEqual(b.body.coupon.coupon_code, a.body.coupon.coupon_code);
+  const other = submit(c, 'devOther', { clientSubmitId: 'legacy-1' });
+  assert.ok(!other.body.duplicate);
+  c.env.Store.reset();
+  assert.strictEqual(c.env.Store.all('survey_responses').length, 2);
+  // 舊格式且 result 為空（中途失敗）→ 同裝置續傳同一筆
+  const c2 = boot();
+  submit(c2, 'devX', { clientSubmitId: 'legacy-2' });
+  c2.env.Store.reset();
+  const r2 = c2.env.Store.all('survey_responses')[0];
+  c2.env.Store.update('survey_responses', r2.id, { client_submit_id: 'legacy-2', result: null });
+  assert.strictEqual(submit(c2, 'devX', { clientSubmitId: 'legacy-2' }).status, 200);
+  c2.env.Store.reset();
+  assert.strictEqual(c2.env.Store.all('survey_responses').length, 1);
+  assert.strictEqual(c2.env.Store.all('coupons').length, 1);
+});
+
 console.log('\n後台與匯出');
 test('儀表板、意見、兌換券列表、我的兌換券', () => {
   const c = boot();

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>櫃台核銷操作單｜服務台贈品兌換</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+:root{--paper:#F5F3ED;--ink:#1D3029;--green:#234F46;--muted:#53645B;--line:#D9DFD8;--soft:#EAF2EC;--red:#9A352E;--gray:#4F5C56;--amber:#805219}
+*{box-sizing:border-box}
+html{font-size:16px}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:"Noto Sans TC","Microsoft JhengHei",sans-serif;font-size:16px;line-height:1.5}
+h1,h2,p{margin:0}
+.sheet h1{font-size:29px;line-height:1.35;font-weight:700;letter-spacing:.02em}
+.sheet h2{font-size:20px;line-height:1.4;font-weight:700}
+strong{font-weight:700}
+a{color:var(--green);text-decoration:underline;text-underline-offset:3px}
+.tools{max-width:210mm;margin:20px auto 16px;padding:0 12px;display:flex;gap:16px;align-items:center;justify-content:space-between}
+.tools p{font-size:16px;flex:1}
+.tools button{font:inherit;min-height:48px;padding:10px 20px;border:1px solid var(--green);border-radius:12px;background:var(--green);color:#fff;font-weight:700;cursor:pointer;white-space:nowrap}
+button:focus-visible,a:focus-visible{outline:3px solid var(--amber);outline-offset:3px}
+.sheet{width:210mm;padding:12mm;margin:0 auto 24px;background:white;box-shadow:0 5px 28px #1d302919}
+.brand{font-size:16px;line-height:1.5;color:var(--green);font-weight:700;margin-bottom:8px}
+.title-row{display:flex;gap:16px;align-items:center}
+.mark{width:44px;height:48px;border:1px solid var(--green);border-radius:8px;display:grid;place-items:center;flex-shrink:0;color:var(--green)}
+.promise{margin-top:12px;padding:8px 14px;border-left:4px solid var(--green);background:var(--soft);font-size:20px;font-weight:700}
+.rule{margin-top:10px;font-size:16px;color:var(--ink)}
+section{margin-top:14px;break-inside:avoid}
+.section-head{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+.num{display:inline-grid;place-items:center;width:28px;height:28px;border:1px solid var(--green);border-radius:50%;color:var(--green);font-size:16px;font-weight:700;flex-shrink:0}
+.steps{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.step{padding:10px 14px;border:1px solid var(--line);border-radius:12px;min-width:0}
+.step h2{font-size:18px;margin-bottom:5px}
+.step p{font-size:16px}
+table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:16px}
+col:first-child{width:112px}
+th,td{border-bottom:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+th{font-size:16px;background:var(--paper);color:var(--muted);font-weight:700;border-top:1px solid var(--line)}
+.state{font-size:16px;font-weight:700;white-space:nowrap}
+.good{color:var(--green)}.stop{color:var(--red)}.neutral{color:var(--gray)}
+.deliver{padding:10px 14px;border:1px solid var(--green);border-radius:12px}
+.deliver h2{margin-bottom:5px}
+.deliver p+p{margin-top:5px}
+.warning{padding:10px 14px;border:1px solid var(--amber);border-radius:12px}
+.warning h2{color:var(--amber);margin-bottom:5px}
+.warning p+p{margin-top:5px}
+footer{margin-top:16px;padding-top:10px;border-top:1px solid var(--line);font-size:16px;color:var(--muted)}
+footer p+p{margin-top:4px}
+.url{overflow-wrap:anywhere;font-size:16px}
+@page{size:A4 portrait;margin:12mm}
+@media print{
+ html,body{margin:0;padding:0;background:#fff}
+ body{font-size:16px;line-height:1.45;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+ .tools{display:none!important}
+ .sheet{width:186mm;max-width:none;padding:0;margin:0;box-shadow:none;break-inside:avoid;page-break-inside:avoid}
+ a{color:var(--ink)}
+}
+@media screen and (max-width:820px){
+ .sheet{width:calc(100% - 24px);padding:24px}
+ .tools{flex-wrap:wrap}
+ .tools p{flex-basis:100%}
+}
+@media screen and (max-width:560px){
+ .steps{grid-template-columns:1fr}
+ .sheet h1{font-size:26px}.mark{display:none}
+ th,td{padding:9px 6px}col:first-child{width:96px}
+}
+</style>
+</head>
+<body>
+<div class="tools" aria-label="列印設定">
+  <p>列印建議：A4 直式、縮放 100%，關閉瀏覽器的頁首頁尾。</p>
+  <button type="button" onclick="window.print()">列印操作單</button>
+</div>
+<main class="sheet" id="operation-sheet">
+  <header>
+    <p class="brand">林口國家檔案館附屬服務設施</p>
+    <div class="title-row">
+      <span class="mark" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 8h16v12H4zM3 4h18v4H3zM9 12h6M9 16h6"/></svg></span>
+      <h1>服務台贈品兌換｜核銷操作單</h1>
+    </div>
+    <p class="promise">先看見「核銷成功」，再交付贈品。</p>
+    <p class="rule">請於 24 小時內至服務台兌換，逾時自動取消</p>
+  </header>
+
+  <section aria-labelledby="start-heading">
+    <div class="section-head"><span class="num">1</span><h2 id="start-heading">開啟核銷頁，讀取客人的券</h2></div>
+    <div class="steps">
+      <div class="step"><h2>開班準備</h2><p>使用已授權帳號登入核銷頁，確認網路及當班贈品。無法登入請聯絡 Dari。</p></div>
+      <div class="step"><h2>掃碼或輸入券號</h2><p>按「開啟相機掃描」，讀取客人出示的 QR；無法掃碼時，輸入完整券號並按「查詢」。</p></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="status-heading">
+    <div class="section-head"><span class="num">2</span><h2 id="status-heading">看工作人員畫面的查詢結果</h2></div>
+    <table aria-label="券狀態與處理方式">
+      <colgroup><col><col></colgroup>
+      <thead><tr><th scope="col">畫面結果</th><th scope="col">現場怎麼做</th></tr></thead>
+      <tbody>
+        <tr><td class="state good">可兌換</td><td>核對<strong>贈品、券號與期限</strong>，確認可交付後，按一次「確認核銷」。查詢成功尚未完成核銷。</td></tr>
+        <tr><td class="state neutral">已使用</td><td>不再核銷或重複交付。若是剛才操作結果不明，請主管核對本次核銷與交付紀錄。</td></tr>
+        <tr><td class="state stop">已逾期</td><td>不能兌換；向客人說明已超過期限，不自行延長或補發。</td></tr>
+        <tr><td class="state neutral">已作廢</td><td>不能兌換；有疑問交由主管／管理員確認，不自行恢復。</td></tr>
+        <tr><td class="state stop">查無此券</td><td>先確認券號及掃碼內容，再查一次；仍查無時停止交付，請主管協助。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="deliver" aria-labelledby="deliver-heading">
+    <div class="section-head"><span class="num">3</span><h2 id="deliver-heading">看到「核銷成功」，才交付對應贈品</h2></div>
+    <p>等畫面明確顯示「核銷成功」後，依畫面贈品交付一份，再處理下一位客人。</p>
+    <p>不能只憑客人截圖或口頭說明交付；不需詢問姓名、電話或身分證。</p>
+  </section>
+
+  <section class="warning" aria-labelledby="error-heading">
+    <h2 id="error-heading">網路慢、超時或出現錯誤</h2>
+    <p><strong>不要連按，也不要換一台重複核銷。</strong>先重新查詢同一券，確認是否已成功。</p>
+    <p>結果不明、顯示已使用或庫存異常時，請主管核對紀錄；釐清前暫停交付。不自行改券、補發或扣庫。</p>
+  </section>
+
+  <footer>
+    <p>交班核對贈品與異常紀錄；離開工作站請登出。帳密與完整有效券碼不放公開紀錄。</p>
+    <p class="url">核銷頁：<a href="https://dari-design-web.github.io/survey-backend/v2/web/admin/redeem.html">dari-design-web.github.io/survey-backend/v2/web/admin/redeem.html</a></p>
+    <p>製作日期：2026 年 11 月 2 日</p>
+  </footer>
+</main>
+</body>
+</html>
+
