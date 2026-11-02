@@ -1,0 +1,20 @@
+/* 正式頁面與設計系統的銜接：沿用 Tailwind 的頁面也套用相同色彩與字級 */
+body{background:var(--paper)!important;color:var(--ink)!important;font-family:'Noto Sans TC','Microsoft JhengHei',sans-serif}
+/* 設計系統：全站文字不小於 16px */
+.text-xs,.text-sm,.text-\[10px\],.text-\[11px\]{font-size:1rem!important;line-height:1.65!important}
+.bg-slate-50{background-color:var(--paper)!important}
+.text-slate-500,.text-slate-400{color:var(--muted)!important}
+.text-slate-800,.text-slate-900{color:var(--ink)!important}
+.rounded-xl{border-radius:20px}
+input:not([type=radio]):not([type=checkbox]),select,textarea{min-height:44px;border-color:var(--edge)}
+button{min-height:44px}
+/* 後台側欄：桌機固定在左側 */
+.admin-sidebar{position:fixed!important;left:0;top:0;bottom:0;width:232px;height:100vh;z-index:40;overflow-y:auto}
+@media(min-width:1024px){body.has-sidebar{padding-left:232px}}
+body.has-sidebar .admin-top{position:sticky;top:0;z-index:30}
+@media(max-width:1023px){body.has-sidebar .admin-top{display:none}}
+.mobile-admin .between{flex-wrap:nowrap}
+/* 正式表格維持左對齊（設計稿的最後一欄右對齊只適用數字表） */
+td:last-child,th:last-child{text-align:inherit}
+canvas{height:auto}
+.pre{white-space:pre-line}

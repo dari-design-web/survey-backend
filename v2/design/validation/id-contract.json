@@ -1,0 +1,108 @@
+{
+  "index.html": [
+    "list"
+  ],
+  "survey.html": [
+    "f",
+    "msg",
+    "root",
+    "submitBtn"
+  ],
+  "success.html": [
+    "qrBox",
+    "root"
+  ],
+  "coupon.html": [
+    "qrBox",
+    "root"
+  ],
+  "my-coupons.html": [
+    "filterBar",
+    "root"
+  ],
+  "admin/redeem.html": [
+    "code",
+    "confirmBtn",
+    "lookupBtn",
+    "result",
+    "scanBtn",
+    "video"
+  ],
+  "admin/login.html": [
+    "api",
+    "btn",
+    "e",
+    "err",
+    "f",
+    "p"
+  ],
+  "admin/dashboard.html": [
+    "cards",
+    "categoricalList",
+    "commentsList",
+    "couponBox",
+    "couponChart",
+    "couponTable",
+    "dailyChart",
+    "dateFrom",
+    "dateRangeHint",
+    "dateTo",
+    "distChart",
+    "kwChart",
+    "monthlyChart",
+    "neg",
+    "npsChart",
+    "npsSummary",
+    "satChart",
+    "surveyPicker"
+  ],
+  "admin/gifts.html": [
+    "list",
+    "m_err",
+    "m_hint",
+    "m_note",
+    "m_noteLabel",
+    "m_ok",
+    "m_qty",
+    "m_qtyLabel",
+    "m_title",
+    "modal",
+    "n_alert",
+    "n_desc",
+    "n_name",
+    "n_qty",
+    "newBox"
+  ],
+  "admin/survey-edit.html": [
+    "busyBar",
+    "f_active",
+    "f_cprefix",
+    "f_csub",
+    "f_ctitle",
+    "f_desc",
+    "f_end",
+    "f_genCoupon",
+    "f_gift",
+    "f_interval",
+    "f_location",
+    "f_nextHint",
+    "f_nextLabel",
+    "f_nextUrl",
+    "f_redLoc",
+    "f_start",
+    "f_thank",
+    "f_title",
+    "f_validDays",
+    "fab",
+    "fabSave",
+    "msg",
+    "qBottomAdd",
+    "qList",
+    "qsec",
+    "saveAllBtnBottom",
+    "saveAllBtnTop",
+    "saveBtn",
+    "saveToast",
+    "title"
+  ]
+}

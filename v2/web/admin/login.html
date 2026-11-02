@@ -2,38 +2,35 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>管理者登入</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="../config.js?v=3.1.1"></script>
-<script src="../js/common.js?v=3.1.1"></script>
-<script src="../js/api.js?v=3.1.1"></script>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-<style>body{font-family:'Noto Sans TC',sans-serif}</style>
+<script src="../config.js?v=3.2.0"></script>
+<script src="../js/common.js?v=3.2.0"></script>
+<script src="../js/api.js?v=3.2.0"></script>
 </head>
-<body class="bg-slate-50 min-h-screen flex items-center justify-center px-4">
-<div class="max-w-sm w-full">
-  <div class="text-center mb-6">
-    <div class="inline-flex w-14 h-14 rounded-xl bg-brand-600 text-white text-2xl items-center justify-center mb-3">📋</div>
-    <h1 class="text-2xl font-bold">滿意度管理系統</h1>
-    <p class="text-sm text-slate-500 mt-1">後台管理登入</p>
-  </div>
-  <form id="f" class="bg-white rounded-xl shadow border border-slate-200 p-6">
-    <div id="err" class="hidden bg-red-50 border border-red-200 text-red-700 rounded p-3 mb-4 text-sm"></div>
-    <div class="space-y-4">
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">Email</label>
-        <input type="email" id="e" required class="w-full border border-slate-300 rounded-lg px-3 py-2.5">
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">密碼</label>
-        <input type="password" id="p" required class="w-full border border-slate-300 rounded-lg px-3 py-2.5">
-      </div>
-      <button type="submit" id="btn" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-2.5 rounded-lg">登入</button>
-    </div>
-  </form>
-  <p class="text-center mt-4 text-xs text-slate-400">忘記密碼請聯絡系統管理者。連續輸入錯誤 5 次會暫停登入 10 分鐘。</p>
+<body>
+<div class="login-layout">
+  <section class="login-story">
+    <div><script>document.write(icon('archive', 32))</script>
+      <p style="margin-top:16px;font-weight:700">服務問卷管理</p><p>林口國家檔案館附屬服務設施</p></div>
+    <h1 class="serif">讓每一份回饋，<br>成為更好的服務。</h1>
+    <svg class="archive-art" viewBox="0 0 180 150" fill="none" aria-hidden="true"><path d="M8 138h164M20 138V41h34v97M63 138V28h35v110M107 138V16h43v122M28 58h18m-18 8h18m-18 8h18M72 47h17m-17 8h17m-17 8h17m27-27h25m-25 8h25m-25 8h25M29 117h15M73 117h16m27 0h25" stroke="currentColor" stroke-width="2"/></svg>
+  </section>
+  <section class="login-panel"><div>
+    <p class="eyebrow">管理者登入</p>
+    <h2 style="font-size:28px;margin-top:8px">歡迎回來</h2>
+    <p class="muted" style="margin-top:8px">請使用管理者提供的帳號登入。</p>
+    <form id="f" novalidate>
+      <div id="err" class="hidden" role="alert" style="margin-bottom:20px"></div>
+      <label class="field" for="e"><span>Email</span><input type="email" id="e" required autocomplete="username" class="input"></label>
+      <label class="field" for="p"><span>密碼</span><input type="password" id="p" required autocomplete="current-password" class="input"></label>
+      <button type="submit" id="btn" class="btn btn-primary primary-action full">登入</button>
+    </form>
+    <p class="muted" style="margin-top:20px">忘記密碼請聯絡系統管理者。連續輸入錯誤 5 次會暫停登入 10 分鐘。</p>
+  </div></section>
 </div>
+<style>@media(max-width:767px){.login-layout{grid-template-columns:1fr}.login-story{padding:28px 20px}.login-story .archive-art{display:none}.login-story h1{font-size:26px;margin-top:16px}}</style>
 <script>
 document.getElementById('f').addEventListener('submit', async e => {
   e.preventDefault();
@@ -49,7 +46,7 @@ document.getElementById('f').addEventListener('submit', async e => {
     API.setToken(r.token);
     location.href = r.user.role === 'staff' ? 'redeem.html' : 'dashboard.html';
   } catch (e2) {
-    err.textContent = e2.message;
+    err.innerHTML = notice('error', 'alert', escHtml(e2.message), 'alert');
     err.classList.remove('hidden');
     btn.disabled = false; btn.textContent = '登入';
   }

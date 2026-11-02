@@ -2,78 +2,33 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>兌換券</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="config.js?v=3.1.1"></script>
-<script src="js/common.js?v=3.1.1"></script>
-<script src="js/api.js?v=3.1.1"></script>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-<style>body{font-family:'Noto Sans TC',sans-serif}</style>
+<script src="config.js?v=3.2.0"></script>
+<script src="js/common.js?v=3.2.0"></script>
+<script src="js/api.js?v=3.2.0"></script>
 </head>
-<body class="bg-slate-50 text-slate-800">
-<main class="max-w-md mx-auto px-5 py-8 min-h-screen" id="root">
-  <div class="text-center py-12 text-slate-400">載入中…</div>
-</main>
+<body>
+<div class="customer-shell">
+  <script>document.write(brandHeader())</script>
+  <main id="main" class="customer-main">
+    <a class="link" href="my-coupons.html"><script>document.write(icon('back', 18))</script>我的兌換券</a>
+    <div id="root" style="margin-top:16px"><p class="muted">載入中…</p></div>
+  </main>
+  <script>document.write(bottomNav('coupons'))</script>
+</div>
 <script>
 const code = new URLSearchParams(location.search).get('code');
 const root = document.getElementById('root');
-function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]))}
-
-const TERMS = [
-  '本券限完成問卷後取得，限本人使用。',
-  '每一兌換識別每月限兌換一次。',
-  '本券不得轉售、兌換現金或折抵其他消費。',
-  '本券須於有效期限內兌換（取得後 24 小時），逾時自動取消，恕不補發。',
-  '贈品數量有限，兌完為止。',
-  '主辦單位保有活動內容調整、兌換資格審核及最終解釋之權利。'
-];
-
 (async () => {
-  if (!code) { root.innerHTML = '<div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4">缺少 ?code= 參數</div>'; return; }
+  if (!code) { root.innerHTML = notice('error', 'alert', '缺少兌換券編號。', 'alert'); return; }
   try {
     const { coupon, survey } = await API.get('/api/public/coupons/' + encodeURIComponent(code));
-    const sm = {issued:['未兌換','green'], redeemed:['已兌換','slate'], expired:['已逾期','red'],
-                voided:['已取消','red'], invalid:['無效','red']};
-    const [lab, col] = sm[coupon.status] || [coupon.status, 'slate'];
-    const isActive = coupon.status === 'issued';
-    root.innerHTML = `
-      <div class="bg-white border-2 border-dashed border-brand-400 rounded-2xl p-6 shadow-lg">
-        <div class="text-center">
-          ${survey?.location_name ? `<div class="text-base font-bold text-slate-800 mb-1">📍 ${esc(survey.location_name)}</div>` : ''}
-          ${survey?.title ? `<div class="text-xs text-slate-500 mb-3">${esc(survey.title)}</div>` : ''}
-          <div class="inline-block bg-brand-600 text-white px-3 py-1 rounded text-xs font-bold mb-3">${esc(survey?.coupon_title || '贈品兌換券')}</div>
-          <div class="text-xs text-slate-500">${esc(survey?.coupon_subtitle || '感謝您完成滿意度調查')}</div>
-          <div class="relative my-6 inline-block p-3 bg-white rounded-lg border-2 ${isActive ? 'border-slate-900' : 'border-slate-300 opacity-50'}">
-            <div id="qrBox"></div>
-            ${!isActive ? `<div class="absolute inset-0 flex items-center justify-center"><div class="bg-red-500 text-white text-2xl font-bold px-6 py-2 -rotate-12 rounded">${esc(lab)}</div></div>` : ''}
-          </div>
-          <div class="text-lg font-mono font-bold text-brand-700 tracking-wider">${esc(coupon.coupon_code)}</div>
-          <p class="text-xs text-slate-500 mt-2">請持本券 QR Code 至服務櫃台兌換贈品</p>
-          <div class="mt-4 text-left text-sm space-y-2 border-t pt-4">
-            ${coupon.gift_name ? `<div class="flex justify-between"><span class="text-slate-500">贈品</span><span class="font-bold">${esc(coupon.gift_name)}</span></div>` : ''}
-            <div class="flex justify-between"><span class="text-slate-500">產生時間</span><span>${esc(fmtTpe(coupon.issued_at))}</span></div>
-            <div class="flex justify-between"><span class="text-slate-500">有效期限</span><span>${esc(fmtTpe(coupon.expires_at))}</span></div>
-            ${survey?.redemption_location ? `<div class="flex justify-between"><span class="text-slate-500">兌換地點</span><span class="text-right">${esc(survey.redemption_location)}</span></div>` : ''}
-            <div class="flex justify-between"><span class="text-slate-500">兌換狀態</span><span class="font-bold text-${col}-600">${esc(lab)}</span></div>
-            ${coupon.redeemed_at ? `<div class="flex justify-between"><span class="text-slate-500">核銷時間</span><span>${esc(fmtTpe(coupon.redeemed_at))}</span></div>` : ''}
-          </div>
-        </div>
-      </div>
-
-      <div class="mt-5 bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
-        <p class="font-bold mb-2">兌換注意事項</p>
-        <ol class="list-decimal list-inside space-y-1 text-amber-700 leading-relaxed">
-          ${TERMS.map(t => `<li>${esc(t)}</li>`).join('')}
-        </ol>
-      </div>
-
-      <a href="my-coupons.html" class="mt-6 block w-full text-center bg-white border-2 border-brand-600 text-brand-700 font-bold py-3 rounded-xl">查看我的所有兌換券 →</a>
-      <a href="index.html" class="mt-3 block text-center text-sm text-slate-500">返回首頁</a>`;
-    const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=' + encodeURIComponent(coupon.qr_code_value || coupon.coupon_code);
-    document.getElementById('qrBox').innerHTML = '<img src="' + qrUrl + '" alt="QR Code" width="240" height="240">';
+    root.innerHTML = ticketHTML(coupon, survey) + termsHTML();
   } catch (e) {
-    root.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-xl p-6 text-center"><h1 class="text-xl font-bold text-red-700">查無此兌換券</h1><p class="text-sm text-red-600 mt-2">${esc(e.message)}</p></div><a href="index.html" class="mt-6 block text-center text-sm text-slate-500">返回首頁</a>`;
+    root.innerHTML = `<div class="result-state error"><div class="state-symbol">${icon('alert', 32)}</div><h1>查無此兌換券</h1>
+      <p class="muted" style="margin-top:12px">請確認券號是否正確。（${escHtml(e.message)}）</p></div>`;
   }
 })();
 </script>

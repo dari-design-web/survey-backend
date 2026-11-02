@@ -2,30 +2,24 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>填寫問卷</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="config.js?v=3.1.1"></script>
-<script src="js/common.js?v=3.1.1"></script>
-<script src="js/api.js?v=3.1.1"></script>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-<style>
-  body{font-family:'Noto Sans TC',sans-serif}
-  input,textarea,select{font-size:16px!important}
-  .qtext{white-space:pre-line}
-</style>
+<script src="config.js?v=3.2.0"></script>
+<script src="js/common.js?v=3.2.0"></script>
+<script src="js/api.js?v=3.2.0"></script>
+<style>.qtext{white-space:pre-line}.other-input{flex:1;min-width:0;border:0;border-bottom:1px solid var(--edge);padding:4px 8px;background:transparent}.submit-bar{position:sticky;bottom:0;background:var(--paper);padding:16px 0;border-top:1px solid var(--line);margin-top:28px;z-index:10}</style>
 </head>
-<body class="bg-slate-50 text-slate-800">
-<main class="max-w-md mx-auto px-5 py-6 min-h-screen pb-32">
-  <a href="index.html" class="inline-flex items-center text-sm text-slate-500 mb-4">
-    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-    </svg>返回
-  </a>
-  <div id="root">
-    <div class="text-center py-12 text-slate-400">載入中…</div>
-  </div>
-</main>
+<body>
+<a class="skip" href="#main">跳至主要內容</a>
+<div class="customer-shell">
+  <script>document.write(brandHeader())</script>
+  <main id="main" class="customer-main">
+    <a class="link" href="index.html"><script>document.write(icon("back",18))</script>返回問卷列表</a>
+    <div id="root"><p class="muted" style="margin-top:24px">載入中…</p></div>
+  </main>
+  <script>document.write(bottomNav('survey'))</script>
+</div>
 
 <script>
 const surveyId = Number(new URLSearchParams(location.search).get('id'));
@@ -62,100 +56,60 @@ function isOtherOption(text) {
 function renderSection(q) {
   const opts = parseOptions(q);
   const desc = opts.length ? opts[0] : '';
-  return `<div class="mt-6 first:mt-0">
-    <div class="border-l-4 border-brand-600 bg-brand-50 pl-4 py-3 rounded-r-lg">
-      <h2 class="text-base font-bold text-brand-700">${esc(q.question_text)}</h2>
-      ${desc ? `<p class="text-xs text-slate-600 mt-1 leading-relaxed qtext">${esc(desc)}</p>` : ''}
-    </div>
+  const m = String(q.question_text || '').match(/^(.+?)[｜|](.+)$/);
+  return `<div class="section-title">
+    ${m ? `<p class="eyebrow">${esc(m[1])}</p><h2>${esc(m[2])}</h2>` : `<h2>${esc(q.question_text)}</h2>`}
+    ${desc ? `<p class="muted qtext" style="margin-top:8px">${esc(desc)}</p>` : ''}
   </div>`;
 }
 
 function renderQuestion(q, num) {
   const ratingLabels = ['非常不滿意','不滿意','普通','滿意','非常滿意'];
-  let opts = parseOptions(q);
-  let inner = '';
-  const req = q.is_required ? '<span class="text-red-500 ml-0.5">*</span>' : '';
+  const opts = parseOptions(q);
   const reqAttr = q.is_required ? 'required' : '';
+  const req = q.is_required ? '<span class="required">必填</span>' : '';
+  const otherInput = (o) => `<input id="other_${q.id}" type="text" class="other-input" placeholder="請說明（勿填個資）" maxlength="50"
+      aria-label="${esc(o)}說明" onfocus="this.parentElement.querySelector('input[data-other]').checked=true">`;
+  let inner = '';
 
-  if (q.question_type === 'single') {
-    inner = `<div class="space-y-2">${opts.map((o, i) => {
+  if (q.question_type === 'single' || q.question_type === 'multiple') {
+    const type = q.question_type === 'single' ? 'radio' : 'checkbox';
+    inner = `<div class="choices">${opts.map(o => {
       const other = isOtherOption(o);
-      return `
-      <label class="flex items-center gap-3 px-4 py-3 border border-slate-200 rounded-lg cursor-pointer has-[:checked]:bg-brand-50 has-[:checked]:border-brand-500">
-        <input type="radio" name="q_${q.id}" value="${esc(o)}" ${reqAttr} class="text-brand-600 focus:ring-brand-500"
-          ${other ? `data-other="1" onchange="document.getElementById('other_${q.id}').focus()"` : ''}>
-        <span class="text-sm">${esc(o)}</span>
-        ${other ? `<input id="other_${q.id}" type="text" placeholder="請說明（勿填個資）" maxlength="50" class="ml-auto flex-1 min-w-0 border-b border-slate-300 px-2 py-1 text-sm focus:outline-none focus:border-brand-500" onfocus="this.previousElementSibling.previousElementSibling.checked=true">` : ''}
-      </label>`;
-    }).join('')}</div>`;
-  }
-  else if (q.question_type === 'multiple') {
-    inner = `<div class="space-y-2">${opts.map((o, i) => {
-      const other = isOtherOption(o);
-      return `
-      <label class="flex items-center gap-3 px-4 py-3 border border-slate-200 rounded-lg cursor-pointer has-[:checked]:bg-brand-50 has-[:checked]:border-brand-500">
-        <input type="checkbox" name="q_${q.id}" value="${esc(o)}" class="text-brand-600 rounded focus:ring-brand-500"
-          ${other ? `data-other="1"` : ''}>
-        <span class="text-sm">${esc(o)}</span>
-        ${other ? `<input id="other_${q.id}" type="text" placeholder="請說明（勿填個資）" maxlength="50" class="ml-auto flex-1 min-w-0 border-b border-slate-300 px-2 py-1 text-sm focus:outline-none focus:border-brand-500" onfocus="this.previousElementSibling.previousElementSibling.checked=true">` : ''}
-      </label>`;
+      return `<label class="choice"><input type="${type}" name="q_${q.id}" value="${esc(o)}" ${type === 'radio' ? reqAttr : ''}
+        ${other ? `data-other="1"` : ''}><span>${esc(o)}</span>${other ? otherInput(o) : ''}</label>`;
     }).join('')}</div>`;
   }
   else if (q.question_type === 'rating') {
-    inner = `
-      <div class="grid grid-cols-5 gap-1.5">${[5,4,3,2,1].map(n => `
-        <label class="block">
-          <input type="radio" name="q_${q.id}" value="${n}" ${reqAttr} class="peer hidden">
-          <div class="border border-slate-200 rounded-lg py-3 text-center cursor-pointer peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600 transition">
-            <div class="text-xl font-bold">${n}</div>
-            <div class="text-[10px] mt-0.5">${ratingLabels[n-1]}</div>
-          </div>
-        </label>`).join('')}
+    inner = `<div class="score-grid">${[1,2,3,4,5].map(n => `
+        <label class="score"><input class="sr-only" type="radio" name="q_${q.id}" value="${n}" ${reqAttr}><span>${n}</span><span class="sr-only">分 ${ratingLabels[n-1]}</span></label>`).join('')}
       </div>
-      <label class="block mt-2">
-        <input type="radio" name="q_${q.id}" value="未使用／不適用" ${reqAttr} class="peer hidden">
-        <div class="border border-slate-200 rounded-lg py-2 text-center cursor-pointer peer-checked:bg-slate-500 peer-checked:text-white peer-checked:border-slate-500 transition text-sm">
-          未使用／不適用
-        </div>
-      </label>`;
+      <div class="rating-legend">${ratingLabels.map((l, i) => `<span>${i + 1} 分 ${l}</span>`).join('')}</div>
+      <label class="choice" style="margin-top:16px"><input type="radio" name="q_${q.id}" value="未使用／不適用" ${reqAttr}><span>未使用／不適用</span></label>`;
   }
   else if (q.question_type === 'nps') {
-    inner = `<div class="grid grid-cols-6 gap-1.5">${[0,1,2,3,4,5,6,7,8,9,10].map(n => `
-      <label class="block">
-        <input type="radio" name="q_${q.id}" value="${n}" ${reqAttr} class="peer hidden">
-        <div class="border border-slate-200 rounded-lg py-3 text-center cursor-pointer peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600 transition">
-          <div class="text-base font-bold">${n}</div>
-        </div>
-      </label>`).join('')}</div>
-      <div class="flex justify-between text-[11px] text-slate-500 mt-2 px-1">
-        <span>← 完全不會推薦</span><span>非常願意推薦 →</span>
-      </div>`;
+    inner = `<div class="nps-grid">${[0,1,2,3,4,5,6,7,8,9,10].map(n => `
+      <label class="score"><input class="sr-only" type="radio" name="q_${q.id}" value="${n}" ${reqAttr}><span>${n}</span><span class="sr-only">分</span></label>`).join('')}</div>
+      <div class="between muted" style="margin-top:12px"><span>0 分 完全不會</span><span>10 分 非常願意</span></div>`;
   }
   else if (q.question_type === 'select') {
-    inner = `<select name="q_${q.id}" ${reqAttr} class="w-full border border-slate-300 rounded-lg px-3 py-3">
-      <option value="">請選擇</option>
-      ${opts.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('')}
-    </select>`;
+    inner = `<select name="q_${q.id}" ${reqAttr} class="input" aria-label="${esc(String(q.question_text).split('\n')[0])}">
+      <option value="">請選擇</option>${opts.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('')}</select>`;
   }
   else if (q.question_type === 'textarea') {
-    inner = `<textarea name="q_${q.id}" rows="4" ${reqAttr} placeholder="請輸入您的意見…（請勿填寫姓名、電話、地址等個人資料）" class="w-full border border-slate-300 rounded-lg px-3 py-3"></textarea>
-      <p class="text-[11px] text-amber-700 mt-1">⚠️ 請勿填寫姓名、電話、地址、車牌、身分證等個人資料。</p>`;
+    inner = `<textarea name="q_${q.id}" rows="4" ${reqAttr} class="input" placeholder="請輸入您的意見…"></textarea>
+      <span class="hint">請勿填寫姓名、電話、地址、車牌、身分證等個人資料。</span>`;
   }
   else if (q.question_type === 'phone') {
-    inner = `<input type="tel" name="q_${q.id}" ${reqAttr} placeholder="例如：0912345678" pattern="^09\\d{8}$"
-      class="w-full border border-slate-300 rounded-lg px-3 py-3" inputmode="numeric">
-      <p class="text-xs text-slate-500 mt-1">每一手機號碼每月限兌換一次</p>`;
+    inner = `<input type="tel" name="q_${q.id}" ${reqAttr} class="input" placeholder="例如：0912345678" pattern="^09\\d{8}$" inputmode="numeric">`;
   }
   else {
-    inner = `<input type="text" name="q_${q.id}" ${reqAttr} class="w-full border border-slate-300 rounded-lg px-3 py-3">`;
+    inner = `<input type="text" name="q_${q.id}" ${reqAttr} class="input">`;
   }
 
-  return `<div class="bg-white border border-slate-200 rounded-xl p-5" data-qcard="${q.id}">
-    <div class="text-sm font-semibold text-slate-900 mb-3 qtext">
-      ${num}. ${esc(q.question_text)}${req}
-    </div>
-    ${inner}
-  </div>`;
+  return `<section class="card question" data-qcard="${q.id}"><fieldset>
+    <legend><span class="question-no">問題 ${String(num).padStart(2, '0')}</span><span class="qtext">${esc(q.question_text)}</span>${req}</legend>
+    ${inner}</fieldset></section>`;
 }
 
 // ===== 顯示條件邏輯 =====
@@ -205,7 +159,7 @@ function evaluateAllConditions() {
 
 (async () => {
   if (!surveyId) {
-    root.innerHTML = '<div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4">缺少 ?id= 參數</div>';
+    root.innerHTML = '<div style="margin-top:24px">' + notice('error', 'alert', '缺少問卷編號，請從問卷列表進入。', 'alert') + '</div>';
     return;
   }
   try {
@@ -221,29 +175,13 @@ function evaluateAllConditions() {
     let precheckBanner = '';
     if (precheck?.ok && precheck.eligible === false) {
       if (precheck.reason === 'interval_not_met') {
-        precheckBanner = `
-          <div class="bg-amber-50 border border-amber-300 rounded-xl p-4 text-sm text-amber-800">
-            <p class="font-bold mb-1">⚠️ 您本月已兌換過贈品</p>
-            <p class="text-xs">您仍可填寫問卷分享意見，但本次將不會再產生兌換券。</p>
-            ${precheck.nextDate ? `<p class="text-xs mt-1">下次可兌換日期：<b>${precheck.nextDate}</b></p>` : ''}
-          </div>`;
+        precheckBanner = notice('warning', 'clock', `<strong>您近期已兌換過本問卷的贈品</strong><br>仍歡迎填寫分享意見，本次不會產生兌換券。${precheck.nextDate ? `<br>下次可兌換日期：<strong>${esc(precheck.nextDate)}</strong>` : ''}`);
       } else if (precheck.reason === 'out_of_stock') {
-        precheckBanner = `
-          <div class="bg-amber-50 border border-amber-300 rounded-xl p-4 text-sm text-amber-800">
-            <p class="font-bold mb-1">🎁 本期贈品已兌換完畢</p>
-            <p class="text-xs">仍歡迎您填寫問卷分享意見，本次將不會產生兌換券。</p>
-          </div>`;
+        precheckBanner = notice('warning', 'gift', '<strong>本期贈品已兌換完畢</strong><br>仍可填答，本次不發兌換券。');
       } else if (precheck.reason === 'existing_coupon' && precheck.existingCouponCode) {
-        precheckBanner = `
-          <div class="bg-blue-50 border border-blue-300 rounded-xl p-4 text-sm text-blue-800">
-            <p class="font-bold mb-1">ℹ️ 您已有一張未使用的兌換券</p>
-            <p class="text-xs mb-2">編號：<span class="font-mono">${precheck.existingCouponCode}</span></p>
-            <div class="flex gap-3 text-xs">
-              <a href="coupon.html?code=${encodeURIComponent(precheck.existingCouponCode)}" class="underline">查看此張兌換券 →</a>
-              <a href="my-coupons.html" class="underline">查看我的所有兌換券 →</a>
-            </div>
-            <p class="text-xs mt-2">填寫此問卷不會再產生新券。</p>
-          </div>`;
+        precheckBanner = notice('', 'ticket', `<strong>您已有一張未使用的兌換券</strong><br><span class="mono">${esc(precheck.existingCouponCode)}</span><br>
+          <a class="link" href="coupon.html?code=${encodeURIComponent(precheck.existingCouponCode)}">查看兌換券 ${icon('arrow', 18)}</a>
+          <br>填寫此問卷不會再產生新券。`);
       }
     }
 
@@ -255,42 +193,67 @@ function evaluateAllConditions() {
       return { html: renderQuestion(q, n) };
     });
 
+    const total = questions.filter(q => q.question_type !== 'section').length;
     root.innerHTML = `
-      <div class="mb-5">
-        <h1 class="text-xl font-bold text-slate-900">${esc(survey.title)}</h1>
-        ${survey.location_name ? `<p class="text-xs text-slate-500 mt-1">📍 ${esc(survey.location_name)}</p>` : ''}
-        ${survey.description ? `<div class="text-sm text-slate-600 mt-3 leading-relaxed qtext bg-white border border-slate-200 rounded-xl p-4">${esc(survey.description)}</div>` : ''}
+      <header style="margin-top:20px">
+        ${survey.location_name ? `<p class="eyebrow">${esc(survey.location_name)}</p>` : ''}
+        <h1 class="serif" style="margin:12px 0">${esc(survey.title)}</h1>
+        ${survey.description ? `<p class="muted qtext">${esc(survey.description)}</p>` : ''}
+      </header>
+      <div class="card" style="margin-top:24px">
+        <div class="between"><strong>填答進度</strong><span id="progText">0／${total} 題</span></div>
+        <div class="progress" role="progressbar" aria-label="填答進度" aria-valuemin="0" aria-valuemax="100" id="progBar"><span style="width:0%"></span></div>
+        <p class="muted">匿名填寫、免登入。標示「必填」的題目請務必回答。</p>
       </div>
-      <form id="f" class="space-y-4">
-        ${precheckBanner || `
-          <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-sm text-emerald-800">
-            <p class="font-medium mb-1">✨ 匿名填寫，免登入</p>
-            <p class="text-xs text-emerald-700">您的回饋完全匿名，系統不會收集個資。完成後可獲得電子贈品兌換券。</p>
-          </div>
-        `}
-        ${items.map(it => it.html).join('')}
-        <div id="msg" class="hidden bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm"></div>
-      </form>
-      <div class="text-center text-xs text-slate-400 mt-4 pt-3 border-t border-slate-200">
-        本問卷依據《個人資料保護法》辦理，採完全匿名方式。
-        <a href="privacy.html" target="_blank" class="text-brand-600 underline">隱私權聲明</a>
-      </div>
-      <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-3 shadow-lg">
-        <div class="max-w-md mx-auto">
-          <button id="submitBtn" form="f" type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-4 rounded-xl shadow active:scale-[0.98] transition">送出問卷</button>
+      <div style="margin-top:16px">${precheckBanner}</div>
+      <form id="f" novalidate>
+        <div class="stack">${items.map(it => it.html).join('')}</div>
+        <div id="msg" class="hidden" style="margin-top:24px"></div>
+        <div class="submit-bar">
+          <button id="submitBtn" type="submit" class="btn btn-primary primary-action full">送出問卷</button>
+          <p class="muted" style="margin-top:12px;text-align:center">${esc(REDEEM_RULE)}</p>
         </div>
-      </div>`;
+      </form>`;
     const formEl = document.getElementById('f');
     formEl.addEventListener('submit', submit);
     // 監聽任何輸入變動 → 重新評估顯示條件
     formEl.addEventListener('change', evaluateAllConditions);
     formEl.addEventListener('input', evaluateAllConditions);
+    formEl.addEventListener('change', updateProgress);
+    formEl.addEventListener('input', updateProgress);
     // 首次評估（隱藏條件未滿足的題目）
     evaluateAllConditions();
+    updateProgress();
   } catch (e) {
-    root.innerHTML = `<div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4">無法載入問卷：${esc(e.message)}</div>`;
+    root.innerHTML = '<div style="margin-top:24px">' + notice('error', 'alert', '無法載入問卷：' + esc(e.message), 'alert') + '</div>';
   }
 })();
+
+// 填答進度：只計算目前顯示中的題目（章節不計）
+function updateProgress() {
+  const visible = questions.filter(q => q.question_type !== 'section' && _isConditionMet(q));
+  const done = visible.filter(q => { const v = collectValue(q); return Array.isArray(v) ? v.length : (v !== '' && v != null); }).length;
+  const pct = visible.length ? Math.round(done / visible.length * 100) : 0;
+  const t = document.getElementById('progText'), b = document.getElementById('progBar');
+  if (t) t.textContent = `${done}／${visible.length} 題`;
+  if (b) { b.firstElementChild.style.width = pct + '%'; b.setAttribute('aria-valuenow', pct); }
+}
+
+function showMsg(text) {
+  const msg = document.getElementById('msg');
+  msg.innerHTML = notice('error', 'alert', esc(text), 'alert');
+  msg.classList.remove('hidden');
+}
+
+// 必填檢查：捲動到第一題未填的題目
+function firstMissing() {
+  for (const q of questions) {
+    if (q.question_type === 'section' || !q.is_required || !_isConditionMet(q)) continue;
+    const v = collectValue(q);
+    if (Array.isArray(v) ? !v.length : (v === '' || v == null)) return q;
+  }
+  return null;
+}
 
 function collectValue(q) {
   const f = document.getElementById('f');
@@ -334,6 +297,13 @@ async function submit(e) {
   const msg = document.getElementById('msg');
   const btn = document.getElementById('submitBtn');
   msg.classList.add('hidden');
+  const miss = firstMissing();
+  if (miss) {
+    const card = document.querySelector(`[data-qcard="${miss.id}"]`);
+    showMsg('還有必填題未填：' + String(miss.question_text).split('\n')[0]);
+    if (card) { card.scrollIntoView({ behavior: 'smooth', block: 'center' }); const i = card.querySelector('input,textarea,select'); if (i) setTimeout(() => i.focus({ preventScroll: true }), 400); }
+    return;
+  }
   btn.disabled = true;
   btn.textContent = '送出中…';
 
@@ -343,16 +313,14 @@ async function submit(e) {
     if (btn.disabled) {
       btn.disabled = false;
       btn.textContent = '送出問卷（請再試一次）';
-      msg.textContent = '送出時間過長，請再按一次。如重試多次仍失敗請通知工作人員。';
-      msg.classList.remove('hidden');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      showMsg('送出時間過長，請再按一次。如重試多次仍失敗請通知工作人員。');
     }
   }, 30000);
 
   // 提示文字：5 秒後若還在送出中，顯示「伺服器正在喚醒…」
   const wakingTimer = setTimeout(() => {
     if (btn.disabled) {
-      btn.textContent = '送出中…（伺服器正在喚醒，請稍候）';
+      btn.textContent = '送出中…（請稍候）';
     }
   }, 5000);
 
@@ -386,11 +354,9 @@ async function submit(e) {
     location.href = 'success.html?' + qs.toString();
   } catch (e2) {
     console.error('[submit error]', e2);  // 留 log 方便日後查
-    msg.textContent = '送出失敗：' + (e2 && e2.message ? e2.message : '請稍候再試');
-    msg.classList.remove('hidden');
+    showMsg('送出失敗：' + (e2 && e2.message ? e2.message : '請稍候再試'));
     btn.disabled = false;
     btn.textContent = '重新送出';
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   } finally {
     // 不管成敗都清掉計時器
     clearTimeout(safetyTimer);
@@ -406,10 +372,8 @@ document.addEventListener('visibilitychange', () => {
   } else if (_lastHidden && Date.now() - _lastHidden > 5 * 60 * 1000) {
     const msg = document.getElementById('msg');
     if (msg) {
-      msg.textContent = '頁面閒置過久，建議重新整理後再送出 — 點此自動重整';
+      msg.innerHTML = notice('warning', 'clock', '頁面閒置過久，建議重新整理後再送出。<button type="button" class="btn btn-secondary" style="margin-top:8px" onclick="location.reload()">重新整理</button>');
       msg.classList.remove('hidden');
-      msg.classList.add('cursor-pointer');
-      msg.onclick = () => location.reload();
     }
   }
 });

@@ -21,7 +21,7 @@ const server = http.createServer((req, res) => {
   if (!fs.existsSync(f)) { res.writeHead(404); return res.end(); }
   let body = fs.readFileSync(f);
   if (p.endsWith('config.js')) body = Buffer.from(body.toString().replace(/window.API_BASE = "[^"]*"/, 'window.API_BASE = "' + EXEC + '"'));
-  const type = p.endsWith('.html') ? 'text/html' : p.endsWith('.js') ? 'application/javascript' : 'text/plain';
+  const type = p.endsWith('.html') ? 'text/html' : p.endsWith('.js') ? 'application/javascript' : p.endsWith('.css') ? 'text/css' : 'text/plain';
   res.writeHead(200, { 'Content-Type': type + '; charset=utf-8' });
   res.end(body);
 });

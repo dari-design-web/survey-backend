@@ -2,62 +2,50 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>贈品庫存</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="../config.js?v=3.1.1"></script>
-<script src="../js/common.js?v=3.1.1"></script>
-<script src="../js/api.js?v=3.1.1"></script>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-<style>body{font-family:'Noto Sans TC',sans-serif}</style>
+<script src="../config.js?v=3.2.0"></script>
+<script src="../js/common.js?v=3.2.0"></script>
+<script src="../js/api.js?v=3.2.0"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
 <script>renderAdminHeader('gifts');</script>
-<main class="max-w-5xl mx-auto px-4 sm:px-6 py-6">
-  <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
-    <h1 class="text-2xl font-bold">贈品庫存</h1>
-    <button onclick="toggleNew()" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-bold">+ 新增贈品</button>
-  </div>
-  <p class="text-sm text-slate-500 mb-5">
-    <b>實際庫存</b>＝現場應有的數量；<b>已預留</b>＝已發出、尚未兌換且未過期的券；<b>可發</b>＝實際庫存 − 已預留。
-    民眾填完問卷時會先預扣 1 份，可發為 0 時仍可填答但不發券。券過期或作廢會自動釋放預留。
-  </p>
+<main class="admin-main">
+  <header class="between">
+    <div><p class="eyebrow">贈品庫存</p><h1 style="margin-top:8px">贈品與庫存</h1></div>
+    <button type="button" onclick="toggleNew()" class="btn btn-primary">＋ 新增贈品</button>
+  </header>
+  <div style="margin-bottom:24px"><script>document.write(notice('', 'info', '<strong>實際庫存</strong>＝現場應有數量；<strong>已預留</strong>＝已發出、未兌換且未逾期的券；<strong>可發</strong>＝實際庫存 − 已預留。客人完成問卷時先預扣 1 份；券逾期（24 小時）或作廢會自動回到可發。'))</script></div>
 
-  <div id="newBox" class="hidden bg-white rounded-xl border p-5 mb-5">
-    <h2 class="font-bold mb-3">新增贈品</h2>
-    <div class="grid md:grid-cols-2 gap-3 text-sm">
-      <label class="block"><span class="text-slate-700">贈品名稱 *</span>
-        <input id="n_name" class="mt-1 w-full border rounded px-3 py-2" placeholder="例：檔案館帆布袋"></label>
-      <label class="block"><span class="text-slate-700">期初數量</span>
-        <input id="n_qty" type="number" min="0" value="0" class="mt-1 w-full border rounded px-3 py-2"></label>
-      <label class="block"><span class="text-slate-700">低庫存提醒（可發 ≤ 此數字時標紅）</span>
-        <input id="n_alert" type="number" min="0" value="10" class="mt-1 w-full border rounded px-3 py-2"></label>
-      <label class="block"><span class="text-slate-700">說明（選填）</span>
-        <input id="n_desc" class="mt-1 w-full border rounded px-3 py-2"></label>
+  <div id="newBox" class="hidden card" style="margin-bottom:24px">
+    <h2>新增贈品</h2>
+    <div class="form-grid" style="margin-top:20px">
+      <label class="field" for="n_name"><span>贈品名稱（必填）</span><input id="n_name" class="input" placeholder="例：檔案館帆布袋"></label>
+      <label class="field" for="n_qty"><span>期初數量</span><input id="n_qty" type="number" min="0" value="0" class="input"></label>
+      <label class="field" for="n_alert"><span>低庫存提醒</span><input id="n_alert" type="number" min="0" value="10" class="input"><span class="hint">可發數量低於或等於此數字時標示提醒</span></label>
+      <label class="field" for="n_desc"><span>說明（選填）</span><input id="n_desc" class="input"></label>
     </div>
-    <div class="mt-4 flex gap-2">
-      <button onclick="createGift()" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded text-sm font-bold">建立</button>
-      <button onclick="toggleNew()" class="px-4 py-2 rounded text-sm border">取消</button>
+    <div class="row" style="margin-top:24px">
+      <button type="button" onclick="createGift()" class="btn btn-primary">建立</button>
+      <button type="button" onclick="toggleNew()" class="btn btn-plain">取消</button>
     </div>
-    <p class="text-xs text-slate-500 mt-3">建立後，到「問卷管理 → 編輯問卷」選擇這個贈品，新發的券就會使用它。</p>
+    <p class="hint">建立後，到「問卷設計 → 編輯問卷」選擇這個贈品，新發的券就會使用它。</p>
   </div>
 
-  <div id="list" class="space-y-4"><div class="text-slate-400 text-sm">載入中…</div></div>
+  <div id="list" class="stack"><p class="muted">載入中…</p></div>
 </main>
 
-<!-- 庫存異動視窗 -->
-<div id="modal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-  <div class="bg-white rounded-xl w-full max-w-md p-5">
-    <h3 id="m_title" class="font-bold text-lg mb-1"></h3>
-    <p id="m_hint" class="text-xs text-slate-500 mb-3"></p>
-    <label class="block text-sm"><span id="m_qtyLabel" class="text-slate-700">數量</span>
-      <input id="m_qty" type="number" min="0" class="mt-1 w-full border rounded px-3 py-2 text-lg"></label>
-    <label class="block text-sm mt-3"><span id="m_noteLabel" class="text-slate-700">備註</span>
-      <input id="m_note" class="mt-1 w-full border rounded px-3 py-2"></label>
-    <p id="m_err" class="text-sm text-red-600 mt-2"></p>
-    <div class="mt-4 flex gap-2 justify-end">
-      <button onclick="closeModal()" class="px-4 py-2 rounded text-sm border">取消</button>
-      <button id="m_ok" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded text-sm font-bold">確認</button>
+<div id="modal" class="hidden modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="m_title">
+  <div class="modal-panel">
+    <h2 id="m_title"></h2>
+    <p id="m_hint" class="muted" style="margin-top:8px"></p>
+    <label class="field" for="m_qty"><span id="m_qtyLabel">數量</span><input id="m_qty" type="number" min="0" class="input" style="font-size:20px"></label>
+    <label class="field" for="m_note"><span id="m_noteLabel">備註</span><input id="m_note" class="input"></label>
+    <div id="m_err" role="alert" style="color:var(--red);margin-top:12px"></div>
+    <div class="between">
+      <button type="button" onclick="closeModal()" class="btn btn-plain">取消</button>
+      <button type="button" id="m_ok" class="btn btn-primary">確認</button>
     </div>
   </div>
 </div>
@@ -73,45 +61,41 @@ async function load() {
     gifts = (await API.get('/api/admin/gifts')).gifts;
     render();
   } catch (e) {
-    document.getElementById('list').innerHTML = `<div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4">載入失敗：${esc(e.message)}</div>`;
+    document.getElementById('list').innerHTML = notice('error', 'alert', '載入失敗：' + esc(e.message), 'alert');
   }
 }
 
 function render() {
   const box = document.getElementById('list');
   if (!gifts.length) {
-    box.innerHTML = '<div class="bg-white rounded-xl border p-6 text-center text-slate-500">尚未建立贈品，請先按「+ 新增贈品」。</div>';
+    box.innerHTML = notice('', 'gift', '尚未建立贈品，請先按「＋ 新增贈品」。');
     return;
   }
   box.innerHTML = gifts.map(g => {
     const low = g.is_active && g.low_stock;
-    return `
-    <div class="bg-white rounded-xl border ${low ? 'border-red-300' : ''} ${g.is_active ? '' : 'opacity-60'} p-5">
-      <div class="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <div class="font-bold text-lg">${esc(g.name)} ${g.is_active ? '' : '<span class="text-xs bg-slate-200 rounded px-2 py-0.5 align-middle">已停用</span>'}
-            ${low ? '<span class="text-xs bg-red-100 text-red-700 rounded px-2 py-0.5 align-middle">庫存偏低</span>' : ''}</div>
-          ${g.description ? `<div class="text-sm text-slate-500">${esc(g.description)}</div>` : ''}
-          <div class="text-xs text-slate-500 mt-1">使用中的問卷：${g.surveys.length ? g.surveys.map(s => esc(s.title) + (s.is_active ? '' : '（停用）')).join('、') : '無'}</div>
-        </div>
-        <div class="flex gap-1 text-xs">
-          <button onclick="editGift(${g.id})" class="border rounded px-2 py-1 hover:bg-slate-50">改名稱</button>
-          <button onclick="toggleActive(${g.id})" class="border rounded px-2 py-1 hover:bg-slate-50">${g.is_active ? '停用' : '啟用'}</button>
-        </div>
+    return `<article class="card ${g.is_active ? '' : 'inactive'}" style="${g.is_active ? '' : 'opacity:.7'}">
+      <div class="between">
+        <div><h2>${esc(g.name)}</h2>
+          <div class="row wrap" style="margin-top:8px">${g.is_active ? '<span class="badge">啟用中</span>' : '<span class="badge gray">已停用</span>'}
+          ${low ? '<span class="badge amber">庫存偏低</span>' : ''}</div></div>
+        <div class="row"><button type="button" onclick="editGift(${g.id})" class="btn btn-plain">改名稱</button>
+          <button type="button" onclick="toggleActive(${g.id})" class="btn btn-plain">${g.is_active ? '停用' : '啟用'}</button></div>
       </div>
-      <div class="grid grid-cols-3 gap-3 my-4 text-center">
-        <div class="bg-slate-50 rounded-lg p-3"><div class="text-xs text-slate-500">實際庫存</div><div class="text-2xl font-bold">${g.on_hand}</div></div>
-        <div class="bg-slate-50 rounded-lg p-3"><div class="text-xs text-slate-500">已預留</div><div class="text-2xl font-bold text-amber-600">${g.reserved}</div></div>
-        <div class="${low ? 'bg-red-50' : 'bg-green-50'} rounded-lg p-3"><div class="text-xs text-slate-500">可發</div><div class="text-2xl font-bold ${low ? 'text-red-600' : 'text-green-700'}">${g.available}</div></div>
+      ${g.description ? `<p class="muted" style="margin-top:8px">${esc(g.description)}</p>` : ''}
+      <p class="muted" style="margin-top:8px">使用中的問卷：${g.surveys.length ? g.surveys.map(s => esc(s.title) + (s.is_active ? '' : '（停用）')).join('、') : '無'}</p>
+      <div class="stock-grid">
+        <div class="stock-stat">實際庫存<strong>${g.on_hand}</strong></div>
+        <div class="stock-stat reserved">已預留<strong>${g.reserved}</strong></div>
+        <div class="stock-stat ${low ? 'low' : 'available'}">可發<strong>${g.available}</strong></div>
       </div>
-      <div class="flex flex-wrap gap-2 text-sm">
-        <button onclick="openStock(${g.id},'receive')" class="bg-green-600 hover:bg-green-700 text-white rounded px-3 py-2 font-bold">＋ 入庫</button>
-        <button onclick="openStock(${g.id},'loss')" class="bg-red-50 text-red-700 border border-red-200 rounded px-3 py-2">－ 耗損</button>
-        <button onclick="openStock(${g.id},'count')" class="bg-slate-100 rounded px-3 py-2">盤點調整</button>
-        <button onclick="showLogs(${g.id})" class="ml-auto underline text-slate-600 px-2">異動紀錄</button>
+      <div class="row wrap">
+        <button type="button" onclick="openStock(${g.id},'receive')" class="btn btn-primary">＋ 入庫</button>
+        <button type="button" onclick="openStock(${g.id},'loss')" class="btn btn-danger">－ 耗損</button>
+        <button type="button" onclick="openStock(${g.id},'count')" class="btn btn-secondary">盤點調整</button>
+        <button type="button" onclick="showLogs(${g.id})" class="btn btn-plain" style="margin-left:auto">異動紀錄</button>
       </div>
-      <div id="logs_${g.id}" class="hidden mt-4"></div>
-    </div>`;
+      <div id="logs_${g.id}" class="hidden table-scroll" style="margin-top:20px"></div>
+    </article>`;
   }).join('');
 }
 
@@ -176,21 +160,18 @@ async function showLogs(id) {
   const box = document.getElementById('logs_' + id);
   if (!box.classList.contains('hidden')) { box.classList.add('hidden'); return; }
   box.classList.remove('hidden');
-  box.innerHTML = '<div class="text-sm text-slate-400">載入中…</div>';
+  box.innerHTML = '<p class="muted">載入中…</p>';
   try {
     const { logs } = await API.get('/api/admin/gifts/' + id + '/logs');
-    box.innerHTML = logs.length ? `<div class="overflow-x-auto"><table class="w-full text-xs">
-      <thead class="bg-slate-50 text-slate-500"><tr><th class="px-2 py-2 text-left">時間</th><th class="px-2 py-2 text-left">類型</th>
-      <th class="px-2 py-2 text-right">異動</th><th class="px-2 py-2 text-right">異動後</th><th class="px-2 py-2 text-left">人員</th><th class="px-2 py-2 text-left">備註</th></tr></thead>
-      <tbody class="divide-y">${logs.map(l => `<tr>
-        <td class="px-2 py-1 whitespace-nowrap">${esc(fmtTpe(l.created_at, 'short'))}</td><td class="px-2 py-1">${esc(l.action_label)}</td>
-        <td class="px-2 py-1 text-right font-mono ${l.on_hand_delta < 0 ? 'text-red-600' : 'text-green-700'}">${l.on_hand_delta > 0 ? '+' : ''}${l.on_hand_delta}</td>
-        <td class="px-2 py-1 text-right font-mono">${l.on_hand_after ?? ''}</td><td class="px-2 py-1">${esc(l.admin_name || '系統')}</td>
-        <td class="px-2 py-1">${esc(l.note)}</td></tr>`).join('')}</tbody></table></div>`
-      : '<div class="text-sm text-slate-400">尚無紀錄</div>';
-  } catch (e) { box.innerHTML = `<div class="text-sm text-red-600">${esc(e.message)}</div>`; }
+    box.innerHTML = logs.length ? `<table><thead><tr><th>時間</th><th>類型</th><th>異動</th><th>異動後</th><th>人員</th><th>備註</th></tr></thead>
+      <tbody>${logs.map(l => `<tr><td style="white-space:nowrap">${esc(fmtTpe(l.created_at, 'short'))}</td><td>${esc(l.action_label)}</td>
+        <td class="mono" style="color:${l.on_hand_delta < 0 ? 'var(--red)' : 'var(--green)'}">${l.on_hand_delta > 0 ? '+' : ''}${l.on_hand_delta}</td>
+        <td class="mono">${l.on_hand_after ?? ''}</td><td>${esc(l.admin_name || '系統')}</td><td>${esc(l.note)}</td></tr>`).join('')}</tbody></table>`
+      : '<p class="muted">尚無紀錄</p>';
+  } catch (e) { box.innerHTML = notice('error', 'alert', esc(e.message), 'alert'); }
 }
 
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !document.getElementById('modal').classList.contains('hidden')) closeModal(); });
 load();
 </script>
 </body>

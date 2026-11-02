@@ -2,73 +2,57 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>服務滿意度調查</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="config.js?v=3.1.1"></script>
-<script src="js/common.js?v=3.1.1"></script>
-<script src="js/api.js?v=3.1.1"></script>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-<style>body{font-family:'Noto Sans TC',sans-serif} input,textarea,select{font-size:16px!important}</style>
+<script src="config.js?v=3.2.0"></script>
+<script src="js/common.js?v=3.2.0"></script>
+<script src="js/api.js?v=3.2.0"></script>
 </head>
-<body class="bg-slate-50 text-slate-800">
-<main class="max-w-md mx-auto px-5 py-8 min-h-screen">
-  <div class="text-center mb-8">
-    <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-brand-100 mb-3">
-      <svg class="w-8 h-8 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-      </svg>
+<body>
+<a class="skip" href="#main">跳至主要內容</a>
+<div class="customer-shell">
+  <script>document.write(brandHeader())</script>
+  <main id="main" class="customer-main">
+    <header>
+      <p class="eyebrow">服務體驗回饋</p>
+      <h1 class="serif" style="margin-top:12px">您的感受，<br>是我們進步的起點。</h1>
+      <p class="muted" style="margin-top:16px">留下一點想法，讓下一次到訪更好。問卷採匿名填寫，不需登入。</p>
+    </header>
+    <div class="hero-art">
+      <div><span class="hero-count" id="count">—</span><p class="muted">份進行中的問卷</p></div>
+      <svg class="archive-art" viewBox="0 0 180 150" fill="none" aria-hidden="true"><path d="M8 138h164M20 138V41h34v97M63 138V28h35v110M107 138V16h43v122M28 58h18m-18 8h18m-18 8h18M72 47h17m-17 8h17m-17 8h17m27-27h25m-25 8h25m-25 8h25M29 117h15M73 117h16m27 0h25" stroke="currentColor" stroke-width="2"/></svg>
     </div>
-    <h1 class="text-2xl font-bold text-slate-900">服務滿意度調查</h1>
-    <p class="text-sm text-slate-500 mt-2">感謝您的回饋，完成問卷後可獲得電子贈品兌換券</p>
-  </div>
-
-  <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 text-sm text-amber-800">
-    <p class="font-medium mb-2">📌 兌換注意事項</p>
-    <ul class="list-disc list-inside space-y-1 text-amber-700">
-      <li>每張兌換券限使用一次</li>
-      <li>兌換券不得截圖重複使用</li>
-      <li>贈品數量有限，兌完為止</li>
-      <li>逾期兌換券無效</li>
-    </ul>
-  </div>
-
-  <div id="list" class="space-y-3">
-    <div class="text-center py-8 text-slate-400">載入中…</div>
-  </div>
-
-  <div class="mt-10 text-center text-xs text-slate-400">© 服務滿意度調查系統</div>
-</main>
+    <div id="list" class="stack"><p class="muted">載入中…</p></div>
+    <div style="margin-top:24px"><script>document.write(notice('warning', 'clock', REDEEM_RULE))</script></div>
+  </main>
+  <script>document.write(bottomNav('survey'))</script>
+</div>
 
 <script>
 (async () => {
   const list = document.getElementById('list');
   try {
     const { surveys } = await API.get('/api/public/surveys');
+    document.getElementById('count').textContent = String(surveys.length).padStart(2, '0');
     if (!surveys.length) {
-      list.innerHTML = '<div class="bg-white rounded-lg p-8 text-center text-slate-400 border">目前沒有進行中的問卷</div>';
+      list.innerHTML = notice('', 'info', '目前沒有進行中的問卷，歡迎稍後再回來。');
       return;
     }
     list.innerHTML = surveys.map(s => `
-      <a href="survey.html?id=${s.id}" class="block bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:border-brand-400 hover:shadow active:scale-[0.98] transition">
-        <div class="flex items-center justify-between">
-          <div>
-            <h2 class="font-bold text-lg text-slate-900">${escapeHtml(s.title)}</h2>
-            ${s.location_name ? `<p class="text-xs text-slate-500 mt-1">📍 ${escapeHtml(s.location_name)}</p>` : ''}
-          </div>
-          <svg class="w-6 h-6 text-brand-500 ml-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-          </svg>
-        </div>
-        ${s.description ? `<p class="text-sm text-slate-600 mt-3 leading-relaxed line-clamp-2">${escapeHtml(s.description)}</p>` : ''}
-        <div class="mt-3 inline-flex items-center text-xs font-medium text-brand-600">開始填寫問卷</div>
-      </a>
-    `).join('');
+      <article class="card featured survey-card">
+        <div class="between"><span class="badge">${icon('check', 16)}開放填寫</span>
+          ${s.location_name ? `<span class="muted">${escHtml(s.location_name)}</span>` : ''}</div>
+        <h2>${escHtml(s.title)}</h2>
+        ${s.description ? `<p class="muted" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${escHtml(s.description)}</p>` : ''}
+        ${s.generate_coupon ? `<div class="gift-strip">${icon('gift', 28)}<div><strong>完成後可領取紀念贈品</strong>
+          <p>${s.gift_name ? escHtml(s.gift_name) + ' · ' : ''}每券一份，數量有限</p></div></div>` : '<div style="height:20px"></div>'}
+        <a class="btn btn-primary primary-action full" href="survey.html?id=${s.id}">開始填寫 ${icon('arrow')}</a>
+      </article>`).join('');
   } catch (e) {
-    list.innerHTML = `<div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 text-sm">無法連線伺服器：${escapeHtml(e.message)}<br><span class="text-xs text-red-500">請確認 config.js 中的 API_BASE 設定，並確認後端已啟動。</span></div>`;
+    list.innerHTML = notice('error', 'alert', '暫時無法連線，請稍後再試一次。<br><span class="muted">' + escHtml(e.message) + '</span>', 'alert');
   }
 })();
-function escapeHtml(s){return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]))}
 </script>
 </body>
 </html>

@@ -1,0 +1,105 @@
+// 共用版面元件（依 v2/design 設計系統）：品牌列、底部導覽、頁尾、圖示
+(function () {
+  const P = {
+    archive: 'M4 8h16v12H4zM3 4h18v4H3zM9 12h6M9 16h6',
+    check: 'm5 12 4 4L19 6',
+    arrow: 'M5 12h14m-6-6 6 6-6 6',
+    back: 'm14 5-7 7 7 7',
+    gift: 'M3 9h18v4H3zM5 13v8h14v-8M12 9v12M12 9C4 9 4 3 8 3c3 0 4 6 4 6Zm0 0c8 0 8-6 4-6-3 0-4 6-4 6Z',
+    clock: 'M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0',
+    info: 'M12 11v6m0-10v1M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0',
+    alert: 'M12 9v4m0 4h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z',
+    x: 'M18 6 6 18M6 6l12 12',
+    pen: 'm4 16-1 5 5-1L21 7l-5-5L4 16Zm9-11 5 5',
+    ticket: 'M3 6h18v4a2 2 0 0 0 0 4v4H3v-4a2 2 0 0 0 0-4V6Zm12 0v12',
+    pin: 'M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12Zm0-9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',
+    scan: 'M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 12h10',
+    chart: 'M4 20V10m6 10V4m6 16v-7m4 7H2',
+    box: 'M3 9h18v4H3zM5 13v8h14v-8M12 9v12',
+    list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
+    users: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
+    download: 'M12 3v12m-5-5 5 5 5-5M5 21h14',
+    msg: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z'
+  };
+  window.icon = function (name, size) {
+    size = size || 20;
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${P[name] || ''}"/></svg>`;
+  };
+  window.ORG_NAME = '林口國家檔案館';
+  window.ORG_SUB = '附屬服務設施';
+  window.REDEEM_RULE = '請於 24 小時內至服務台兌換，逾時自動取消';
+
+  window.brandHeader = function () {
+    return `<header class="brand-header"><span class="brand-mark">${icon('archive', 28)}</span>
+      <div class="brand-copy">${ORG_NAME}<br><span class="muted">${ORG_SUB}</span></div></header>`;
+  };
+  window.bottomNav = function (cur) {
+    return `<nav class="bottom-nav" aria-label="客人端導覽">
+      <a href="index.html" ${cur === 'survey' ? 'aria-current="page"' : ''}>${icon('pen')}填寫問卷</a>
+      <a href="my-coupons.html" ${cur === 'coupons' ? 'aria-current="page"' : ''}>${icon('ticket')}我的兌換券</a></nav>
+      <footer class="footer"><p>${ORG_NAME}${ORG_SUB}</p><p><a class="link" href="privacy.html">隱私權聲明</a></p></footer>`;
+  };
+  window.notice = function (kind, iconName, html, role) {
+    return `<div class="notice ${kind || ''}" role="${role || 'status'}">${icon(iconName, 24)}<div>${html}</div></div>`;
+  };
+  window.escHtml = function (s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  };
+  // 券狀態：文字＋圖示＋顏色
+  window.COUPON_STATE = {
+    issued: { label: '未兌換', cls: '', icon: 'check' },
+    redeemed: { label: '已兌換', cls: 'gray', icon: 'check' },
+    expired: { label: '已逾期', cls: 'red', icon: 'clock' },
+    voided: { label: '已作廢', cls: 'gray', icon: 'x' },
+    invalid: { label: '無效', cls: 'red', icon: 'x' }
+  };
+  window.couponBadge = function (status) {
+    const s = COUPON_STATE[status] || { label: status, cls: 'gray', icon: 'info' };
+    return `<span class="badge ${s.cls}">${icon(s.icon, 16)}${s.label}</span>`;
+  };
+  window.qrImg = function (text) {
+    return `<img src="https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=0&data=${encodeURIComponent(text)}" alt="兌換券 QR Code" width="212" height="212">`;
+  };
+})();
+
+// 兌換券票券（success.html 與 coupon.html 共用）：有效時才顯示可掃描 QR
+window.ticketHTML = function (coupon, survey) {
+  const st = coupon.status;
+  const active = st === 'issued';
+  const fmt = (window.fmtTpe || (x => x));
+  const row = (k, v) => v ? `<div><dt>${k}</dt><dd>${v}</dd></div>` : '';
+  return `<article class="card ticket">
+    <div class="ticket-head">
+      ${survey && survey.location_name ? `<p class="eyebrow">${escHtml(survey.location_name)}</p>` : ''}
+      <h2>${escHtml((survey && survey.coupon_title) || '贈品兌換券')}</h2>
+      <p class="muted">${escHtml((survey && survey.coupon_subtitle) || '感謝您完成滿意度調查')}</p>
+      <div style="margin-top:12px">${couponBadge(st)}</div>
+    </div>
+    ${active
+      ? `<div class="qr-box" id="qrBox">${qrImg(coupon.qr_code_value || coupon.coupon_code)}</div>
+         <p class="muted" style="text-align:center">請將此畫面出示給服務台人員掃描</p>`
+      : `<div class="qr-box" id="qrBox" style="flex-direction:column;gap:8px;color:var(--muted)">${icon(COUPON_STATE[st] ? COUPON_STATE[st].icon : 'x', 40)}
+           <strong>此券${escHtml((COUPON_STATE[st] || {}).label || '無效')}，無法兌換</strong></div>`}
+    <p class="ticket-code mono">${escHtml(coupon.coupon_code)}</p>
+    <dl class="meta-list">
+      ${row('贈品', coupon.gift_name ? `<strong>${escHtml(coupon.gift_name)}</strong>` : '')}
+      ${row('取得時間', escHtml(fmt(coupon.issued_at, 'short')))}
+      ${row('兌換期限', `<strong>${escHtml(fmt(coupon.expires_at, 'short'))}</strong>`)}
+      ${row('兌換地點', survey && survey.redemption_location ? escHtml(survey.redemption_location) : '')}
+      ${row('核銷時間', coupon.redeemed_at ? escHtml(fmt(coupon.redeemed_at, 'short')) : '')}
+    </dl>
+    ${active ? `<div class="deadline row">${icon('clock', 22)}<div>${REDEEM_RULE}</div></div>` : ''}
+  </article>`;
+};
+
+window.TERMS = [
+  '本券限完成問卷後取得，限本人使用。',
+  '請於 24 小時內至服務台兌換，逾時自動取消，恕不補發。',
+  '本券不得轉售、兌換現金或折抵其他消費。',
+  '贈品數量有限，兌完為止。',
+  '主辦單位保有活動內容調整、兌換資格審核及最終解釋之權利。'
+];
+window.termsHTML = function () {
+  return `<details class="card" style="margin-top:24px"><summary>兌換注意事項</summary>
+    <ol style="margin:8px 0 0;padding-left:1.4em" class="stack-sm">${TERMS.map(t => `<li>${escHtml(t)}</li>`).join('')}</ol></details>`;
+};
