@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>贈品庫存</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../config.js"></script>
+<script src="../js/common.js"></script>
+<script src="../js/api.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>body{font-family:'Noto Sans TC',sans-serif}</style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+<script>renderAdminHeader('gifts');</script>
+<main class="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+  <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
+    <h1 class="text-2xl font-bold">贈品庫存</h1>
+    <button onclick="toggleNew()" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-bold">+ 新增贈品</button>
+  </div>
+  <p class="text-sm text-slate-500 mb-5">
+    <b>實際庫存</b>＝現場應有的數量；<b>已預留</b>＝已發出、尚未兌換且未過期的券；<b>可發</b>＝實際庫存 − 已預留。
+    民眾填完問卷時會先預扣 1 份，可發為 0 時仍可填答但不發券。券過期或作廢會自動釋放預留。
+  </p>
+
+  <div id="newBox" class="hidden bg-white rounded-xl border p-5 mb-5">
+    <h2 class="font-bold mb-3">新增贈品</h2>
+    <div class="grid md:grid-cols-2 gap-3 text-sm">
+      <label class="block"><span class="text-slate-700">贈品名稱 *</span>
+        <input id="n_name" class="mt-1 w-full border rounded px-3 py-2" placeholder="例：檔案館帆布袋"></label>
+      <label class="block"><span class="text-slate-700">期初數量</span>
+        <input id="n_qty" type="number" min="0" value="0" class="mt-1 w-full border rounded px-3 py-2"></label>
+      <label class="block"><span class="text-slate-700">低庫存提醒（可發 ≤ 此數字時標紅）</span>
+        <input id="n_alert" type="number" min="0" value="10" class="mt-1 w-full border rounded px-3 py-2"></label>
+      <label class="block"><span class="text-slate-700">說明（選填）</span>
+        <input id="n_desc" class="mt-1 w-full border rounded px-3 py-2"></label>
+    </div>
+    <div class="mt-4 flex gap-2">
+      <button onclick="createGift()" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded text-sm font-bold">建立</button>
+      <button onclick="toggleNew()" class="px-4 py-2 rounded text-sm border">取消</button>
+    </div>
+    <p class="text-xs text-slate-500 mt-3">建立後，到「問卷管理 → 編輯問卷」選擇這個贈品，新發的券就會使用它。</p>
+  </div>
+
+  <div id="list" class="space-y-4"><div class="text-slate-400 text-sm">載入中…</div></div>
+</main>
+
+<!-- 庫存異動視窗 -->
+<div id="modal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl w-full max-w-md p-5">
+    <h3 id="m_title" class="font-bold text-lg mb-1"></h3>
+    <p id="m_hint" class="text-xs text-slate-500 mb-3"></p>
+    <label class="block text-sm"><span id="m_qtyLabel" class="text-slate-700">數量</span>
+      <input id="m_qty" type="number" min="0" class="mt-1 w-full border rounded px-3 py-2 text-lg"></label>
+    <label class="block text-sm mt-3"><span id="m_noteLabel" class="text-slate-700">備註</span>
+      <input id="m_note" class="mt-1 w-full border rounded px-3 py-2"></label>
+    <p id="m_err" class="text-sm text-red-600 mt-2"></p>
+    <div class="mt-4 flex gap-2 justify-end">
+      <button onclick="closeModal()" class="px-4 py-2 rounded text-sm border">取消</button>
+      <button id="m_ok" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded text-sm font-bold">確認</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]))}
+let gifts = [];
+
+function toggleNew() { document.getElementById('newBox').classList.toggle('hidden'); }
+
+async function load() {
+  try {
+    gifts = (await API.get('/api/admin/gifts')).gifts;
+    render();
+  } catch (e) {
+    document.getElementById('list').innerHTML = `<div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4">載入失敗：${esc(e.message)}</div>`;
+  }
+}
+
+function render() {
+  const box = document.getElementById('list');
+  if (!gifts.length) {
+    box.innerHTML = '<div class="bg-white rounded-xl border p-6 text-center text-slate-500">尚未建立贈品，請先按「+ 新增贈品」。</div>';
+    return;
+  }
+  box.innerHTML = gifts.map(g => {
+    const low = g.is_active && g.low_stock;
+    return `
+    <div class="bg-white rounded-xl border ${low ? 'border-red-300' : ''} ${g.is_active ? '' : 'opacity-60'} p-5">
+      <div class="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <div class="font-bold text-lg">${esc(g.name)} ${g.is_active ? '' : '<span class="text-xs bg-slate-200 rounded px-2 py-0.5 align-middle">已停用</span>'}
+            ${low ? '<span class="text-xs bg-red-100 text-red-700 rounded px-2 py-0.5 align-middle">庫存偏低</span>' : ''}</div>
+          ${g.description ? `<div class="text-sm text-slate-500">${esc(g.description)}</div>` : ''}
+          <div class="text-xs text-slate-500 mt-1">使用中的問卷：${g.surveys.length ? g.surveys.map(s => esc(s.title) + (s.is_active ? '' : '（停用）')).join('、') : '無'}</div>
+        </div>
+        <div class="flex gap-1 text-xs">
+          <button onclick="editGift(${g.id})" class="border rounded px-2 py-1 hover:bg-slate-50">改名稱</button>
+          <button onclick="toggleActive(${g.id})" class="border rounded px-2 py-1 hover:bg-slate-50">${g.is_active ? '停用' : '啟用'}</button>
+        </div>
+      </div>
+      <div class="grid grid-cols-3 gap-3 my-4 text-center">
+        <div class="bg-slate-50 rounded-lg p-3"><div class="text-xs text-slate-500">實際庫存</div><div class="text-2xl font-bold">${g.on_hand}</div></div>
+        <div class="bg-slate-50 rounded-lg p-3"><div class="text-xs text-slate-500">已預留</div><div class="text-2xl font-bold text-amber-600">${g.reserved}</div></div>
+        <div class="${low ? 'bg-red-50' : 'bg-green-50'} rounded-lg p-3"><div class="text-xs text-slate-500">可發</div><div class="text-2xl font-bold ${low ? 'text-red-600' : 'text-green-700'}">${g.available}</div></div>
+      </div>
+      <div class="flex flex-wrap gap-2 text-sm">
+        <button onclick="openStock(${g.id},'receive')" class="bg-green-600 hover:bg-green-700 text-white rounded px-3 py-2 font-bold">＋ 入庫</button>
+        <button onclick="openStock(${g.id},'loss')" class="bg-red-50 text-red-700 border border-red-200 rounded px-3 py-2">－ 耗損</button>
+        <button onclick="openStock(${g.id},'count')" class="bg-slate-100 rounded px-3 py-2">盤點調整</button>
+        <button onclick="showLogs(${g.id})" class="ml-auto underline text-slate-600 px-2">異動紀錄</button>
+      </div>
+      <div id="logs_${g.id}" class="hidden mt-4"></div>
+    </div>`;
+  }).join('');
+}
+
+async function createGift() {
+  const body = { name: n_name.value.trim(), initial_qty: +n_qty.value || 0, low_stock_alert: +n_alert.value || 0, description: n_desc.value.trim() };
+  if (!body.name) return alert('請填寫贈品名稱');
+  try {
+    await API.post('/api/admin/gifts', body);
+    n_name.value = ''; n_qty.value = 0; n_desc.value = '';
+    toggleNew(); load();
+  } catch (e) { alert('建立失敗：' + e.message); }
+}
+
+async function editGift(id) {
+  const g = gifts.find(x => x.id === id);
+  const name = prompt('贈品名稱', g.name);
+  if (name === null) return;
+  const alertN = prompt('低庫存提醒數量', g.low_stock_alert ?? 10);
+  if (alertN === null) return;
+  try { await API.put('/api/admin/gifts/' + id, { name, low_stock_alert: +alertN || 0 }); load(); }
+  catch (e) { alert('儲存失敗：' + e.message); }
+}
+
+async function toggleActive(id) {
+  const g = gifts.find(x => x.id === id);
+  if (g.is_active && g.surveys.some(s => s.is_active) && !confirm('有啟用中的問卷使用此贈品，停用後這些問卷將不再發券。確定停用？')) return;
+  try { await API.put('/api/admin/gifts/' + id, { is_active: !g.is_active }); load(); }
+  catch (e) { alert('操作失敗：' + e.message); }
+}
+
+const ACTIONS = {
+  receive: { title: '入庫', hint: '新到貨或補貨，數量會加到實際庫存。', qty: '入庫數量', note: '備註（選填，例如進貨單號）' },
+  loss: { title: '耗損', hint: '破損、遺失、贈送他用等，數量會從實際庫存扣除。', qty: '耗損數量', note: '原因（必填）' },
+  count: { title: '盤點調整', hint: '輸入現場實際點到的數量，系統會自動計算差額並記錄。', qty: '實際點到的數量', note: '說明（必填，例如月底盤點）' }
+};
+let modalCtx = null;
+
+function openStock(id, action) {
+  const g = gifts.find(x => x.id === id), a = ACTIONS[action];
+  modalCtx = { id, action };
+  m_title.textContent = a.title + '｜' + g.name;
+  m_hint.textContent = a.hint + (action !== 'receive' ? `（目前實際 ${g.on_hand}、已預留 ${g.reserved}，實際庫存不可少於已預留）` : '');
+  m_qtyLabel.textContent = a.qty; m_noteLabel.textContent = a.note;
+  m_qty.value = action === 'count' ? g.on_hand : ''; m_note.value = ''; m_err.textContent = '';
+  document.getElementById('modal').classList.remove('hidden');
+  setTimeout(() => m_qty.focus(), 50);
+}
+function closeModal() { document.getElementById('modal').classList.add('hidden'); modalCtx = null; }
+
+document.getElementById('m_ok').addEventListener('click', async () => {
+  if (!modalCtx) return;
+  const btn = document.getElementById('m_ok');
+  btn.disabled = true; m_err.textContent = '';
+  try {
+    await API.post('/api/admin/gifts/' + modalCtx.id + '/stock', { action: modalCtx.action, qty: +m_qty.value, note: m_note.value.trim() });
+    closeModal(); load();
+  } catch (e) { m_err.textContent = e.message; }
+  finally { btn.disabled = false; }
+});
+
+async function showLogs(id) {
+  const box = document.getElementById('logs_' + id);
+  if (!box.classList.contains('hidden')) { box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  box.innerHTML = '<div class="text-sm text-slate-400">載入中…</div>';
+  try {
+    const { logs } = await API.get('/api/admin/gifts/' + id + '/logs');
+    box.innerHTML = logs.length ? `<div class="overflow-x-auto"><table class="w-full text-xs">
+      <thead class="bg-slate-50 text-slate-500"><tr><th class="px-2 py-2 text-left">時間</th><th class="px-2 py-2 text-left">類型</th>
+      <th class="px-2 py-2 text-right">異動</th><th class="px-2 py-2 text-right">異動後</th><th class="px-2 py-2 text-left">人員</th><th class="px-2 py-2 text-left">備註</th></tr></thead>
+      <tbody class="divide-y">${logs.map(l => `<tr>
+        <td class="px-2 py-1 whitespace-nowrap">${esc(fmtTpe(l.created_at, 'short'))}</td><td class="px-2 py-1">${esc(l.action_label)}</td>
+        <td class="px-2 py-1 text-right font-mono ${l.on_hand_delta < 0 ? 'text-red-600' : 'text-green-700'}">${l.on_hand_delta > 0 ? '+' : ''}${l.on_hand_delta}</td>
+        <td class="px-2 py-1 text-right font-mono">${l.on_hand_after ?? ''}</td><td class="px-2 py-1">${esc(l.admin_name || '系統')}</td>
+        <td class="px-2 py-1">${esc(l.note)}</td></tr>`).join('')}</tbody></table></div>`
+      : '<div class="text-sm text-slate-400">尚無紀錄</div>';
+  } catch (e) { box.innerHTML = `<div class="text-sm text-red-600">${esc(e.message)}</div>`; }
+}
+
+load();
+</script>
+</body>
+</html>

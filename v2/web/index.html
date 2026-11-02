@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>服務滿意度調查</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="config.js"></script>
+<script src="js/common.js"></script>
+<script src="js/api.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>body{font-family:'Noto Sans TC',sans-serif} input,textarea,select{font-size:16px!important}</style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+<main class="max-w-md mx-auto px-5 py-8 min-h-screen">
+  <div class="text-center mb-8">
+    <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-brand-100 mb-3">
+      <svg class="w-8 h-8 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+      </svg>
+    </div>
+    <h1 class="text-2xl font-bold text-slate-900">服務滿意度調查</h1>
+    <p class="text-sm text-slate-500 mt-2">感謝您的回饋，完成問卷後可獲得電子贈品兌換券</p>
+  </div>
+
+  <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 text-sm text-amber-800">
+    <p class="font-medium mb-2">📌 兌換注意事項</p>
+    <ul class="list-disc list-inside space-y-1 text-amber-700">
+      <li>每張兌換券限使用一次</li>
+      <li>兌換券不得截圖重複使用</li>
+      <li>贈品數量有限，兌完為止</li>
+      <li>逾期兌換券無效</li>
+    </ul>
+  </div>
+
+  <div id="list" class="space-y-3">
+    <div class="text-center py-8 text-slate-400">載入中…</div>
+  </div>
+
+  <div class="mt-10 text-center text-xs text-slate-400">© 服務滿意度調查系統</div>
+</main>
+
+<script>
+(async () => {
+  const list = document.getElementById('list');
+  try {
+    const { surveys } = await API.get('/api/public/surveys');
+    if (!surveys.length) {
+      list.innerHTML = '<div class="bg-white rounded-lg p-8 text-center text-slate-400 border">目前沒有進行中的問卷</div>';
+      return;
+    }
+    list.innerHTML = surveys.map(s => `
+      <a href="survey.html?id=${s.id}" class="block bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:border-brand-400 hover:shadow active:scale-[0.98] transition">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="font-bold text-lg text-slate-900">${escapeHtml(s.title)}</h2>
+            ${s.location_name ? `<p class="text-xs text-slate-500 mt-1">📍 ${escapeHtml(s.location_name)}</p>` : ''}
+          </div>
+          <svg class="w-6 h-6 text-brand-500 ml-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+          </svg>
+        </div>
+        ${s.description ? `<p class="text-sm text-slate-600 mt-3 leading-relaxed line-clamp-2">${escapeHtml(s.description)}</p>` : ''}
+        <div class="mt-3 inline-flex items-center text-xs font-medium text-brand-600">開始填寫問卷</div>
+      </a>
+    `).join('');
+  } catch (e) {
+    list.innerHTML = `<div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 text-sm">無法連線伺服器：${escapeHtml(e.message)}<br><span class="text-xs text-red-500">請確認 config.js 中的 API_BASE 設定，並確認後端已啟動。</span></div>`;
+  }
+})();
+function escapeHtml(s){return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]))}
+</script>
+</body>
+</html>
