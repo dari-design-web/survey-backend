@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>填寫問卷</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="config.js?v=3.3.1"></script>
-<script src="js/common.js?v=3.3.1"></script>
-<script src="js/api.js?v=3.3.1"></script>
+<script src="config.js?v=3.3.2"></script>
+<script src="js/common.js?v=3.3.2"></script>
+<script src="js/api.js?v=3.3.2"></script>
 <style>.qtext{white-space:pre-line}.other-input{flex:1;min-width:0;border:0;border-bottom:1px solid var(--edge);padding:4px 8px;background:transparent}.submit-bar{position:sticky;bottom:0;background:var(--paper);padding:16px 0;border-top:1px solid var(--line);margin-top:28px;z-index:10}</style>
 </head>
 <body>
@@ -81,11 +81,16 @@ function renderQuestion(q, num) {
     }).join('')}</div>`;
   }
   else if (q.question_type === 'rating') {
+    // 後台設定：第 1 行＝1 分說明、第 2 行＝5 分說明；含「未使用／不適用」才顯示該選項（舊題目未設定時沿用預設）
+    const NA = '未使用／不適用';
+    const cfg = opts.filter(o => o !== NA);
+    const low = cfg[0] || ratingLabels[0], high = cfg[1] || ratingLabels[4];
+    const showNA = !opts.length || opts.includes(NA);
     inner = `<div class="score-grid">${[1,2,3,4,5].map(n => `
-        <label class="score"><input class="sr-only" type="radio" name="q_${q.id}" value="${n}" ${reqAttr}><span>${n}</span><span class="sr-only">分 ${ratingLabels[n-1]}</span></label>`).join('')}
+        <label class="score"><input class="sr-only" type="radio" name="q_${q.id}" value="${n}" ${reqAttr}><span>${n}</span><span class="sr-only">分${n === 1 ? ' ' + esc(low) : n === 5 ? ' ' + esc(high) : ''}</span></label>`).join('')}
       </div>
-      <div class="rating-legend">${ratingLabels.map((l, i) => `<span>${i + 1} 分 ${l}</span>`).join('')}</div>
-      <label class="choice" style="margin-top:16px"><input type="radio" name="q_${q.id}" value="未使用／不適用" ${reqAttr}><span>未使用／不適用</span></label>`;
+      <div class="between muted" style="margin-top:12px"><span>1 分 ${esc(low)}</span><span>5 分 ${esc(high)}</span></div>
+      ${showNA ? `<label class="choice" style="margin-top:16px"><input type="radio" name="q_${q.id}" value="${NA}" ${reqAttr}><span>${NA}</span></label>` : ''}`;
   }
   else if (q.question_type === 'nps') {
     inner = `<div class="nps-grid">${[0,1,2,3,4,5,6,7,8,9,10].map(n => `

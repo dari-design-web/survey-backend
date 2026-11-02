@@ -67,6 +67,9 @@ function check(name, cond, extra) { results.push([name, !!cond]); console.log((c
   check('首頁列出問卷', true);
 
   await page.goto(base + '/survey.html?id=' + ids.survey_id);
+  await page.waitForSelector('.score-grid', { timeout: 8000 });
+  { const tx = await page.innerText('main');
+    check('評分題說明只顯示兩端（1 分 非常不滿意／5 分 非常滿意）', tx.includes('1 分 非常不滿意') && tx.includes('5 分 非常滿意') && !tx.includes('3 分 普通')); }
   await page.waitForSelector('form#f input', { timeout: 8000 });
   // 每個題組選第一個選項（radio）；評分選 5；文字題填字
   await page.evaluate(() => {
@@ -157,7 +160,7 @@ function check(name, cond, extra) { results.push([name, !!cond]); console.log((c
     const m = body.match(/.{0,30}(失敗|Error|錯誤：).{0,30}/);
     check(`後台 ${p} 頁無錯誤`, !m, m && m[0].replace(/\s+/g, ' '));
   }
-  check('系統版本顯示', (await page.textContent('#sysInfo')).includes('3.3.1'));
+  check('系統版本顯示', (await page.textContent('#sysInfo')).includes('3.3.2'));
 
   check('頁面無 JavaScript 例外', errors.length === 0, errors.join(' | '));
   await browser.close();

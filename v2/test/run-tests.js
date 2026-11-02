@@ -562,6 +562,23 @@ test('G11 修正：登入旗標、Email 驗證、圖片內容檢查、更新失�
   assert.ok(c.env.Store.all('gift_images').every(x => x.data === webp || webp.indexOf(x.data) >= 0));
 });
 
+test('評分題：可自訂兩端說明、可關閉「未使用／不適用」', () => {
+  const c = boot();
+  const qs = api(c.env, 'GET', '/api/public/surveys/' + c.ids.survey_id).body.questions;
+  const rq = qs.find(q => q.question_type === 'rating');
+  const send = (val, dev) => api(c.env, 'POST', '/api/public/survey', { surveyId: c.ids.survey_id, deviceId: dev, clientSubmitId: 'r' + Math.random(),
+    answers: fullAnswers(qs).map(a => a.questionId === rq.id ? { questionId: rq.id, value: val } : a) });
+  // 舊題目（未設定）仍可選不適用
+  assert.strictEqual(send('未使用／不適用', 'rA').status, 200);
+  // 設定成不提供不適用
+  c.env.Store.reset();
+  c.env.Store.update('survey_questions', rq.id, { options: ['非常不願意', '非常願意'] });
+  c.env.dispatch({ method: 'POST', path: '/api/admin/system/reconcile', token: c.T });
+  c.env.Store.reset();
+  assert.strictEqual(send('未使用／不適用', 'rB').status, 400);
+  assert.strictEqual(send(4, 'rC').status, 200);
+});
+
 console.log('\n後台與匯出');
 test('儀表板、意見、兌換券列表、我的兌換券', () => {
   const c = boot();

@@ -11,7 +11,7 @@
  * 版本：見 CODE_VERSION。原始碼來源：GitHub dari-design-web/survey-backend /v2/gas/
  */
 
-var CODE_VERSION = '3.3.1';
+var CODE_VERSION = '3.3.2';
 var GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/dari-design-web/survey-backend/main/v2/gas/';
 var TZ = 'Asia/Taipei';
 var JWT_TTL_HOURS = 8;
@@ -809,6 +809,13 @@ function apiPrecheck(ctx, m) {
   return out;
 }
 
+/** 評分題設定存在 options：第 1 行＝1 分說明、第 2 行＝5 分說明；含「未使用／不適用」則提供該選項。未設定（舊題目）時沿用預設並提供。 */
+var RATING_NA = '未使用／不適用';
+function ratingAllowsNA(opts) {
+  if (!opts || !opts.length) return true;
+  return opts.indexOf(RATING_NA) >= 0;
+}
+
 function conditionMet(q, ansByQ, qmap, seen) {
   seen = seen || {};
   if (seen[q.id]) return false;          // 循環設定：視為不顯示，避免無限遞迴
@@ -868,7 +875,10 @@ function validateAnswers(s, answers) {
     var t = q.question_type, text = null, value = null, opts = questionOptions(q);
     if (t === 'rating' || t === 'nps') {
       var num = Number(v);
-      if (v === '未使用／不適用' && t === 'rating') { text = String(v); }
+      if (v === RATING_NA && t === 'rating') {
+        if (!ratingAllowsNA(opts)) fail(400, '此題沒有「未使用／不適用」選項：' + title);
+        text = String(v);
+      }
       else if (isNaN(num) || num !== Math.floor(num) || (t === 'rating' && (num < 1 || num > 5)) || (t === 'nps' && (num < 0 || num > 10))) {
         fail(400, '分數超出範圍：' + title);
       } else { value = num; text = String(num); }
@@ -1990,7 +2000,7 @@ function seedDemo() {
     ['請問您是第幾次到訪本場域？', 'single', 1, ['第一次', '第2～3次', '第4次以上', '經常到訪', '不確定']],
     ['請問您的年齡區間為？', 'single', 1, ['18歲以下', '19～30歲', '31～45歲', '46～60歲', '61歲以上', '不方便透露']],
     ['請問您本次主要同行對象為？', 'single', 1, ['自行前來', '與家人同行', '與朋友同行', '與同事同行', '團體參訪', '其他']],
-    ['第二部分｜服務與環境滿意度', 'section', 0, ['請依照您本次實際體驗感受進行評分。\n評分說明：5分＝非常滿意　4分＝滿意　3分＝普通　2分＝不滿意　1分＝非常不滿意。\n若未使用該項服務，請點選「未使用／不適用」。']],
+    ['第二部分｜服務與環境滿意度', 'section', 0, ['請依照您本次實際體驗感受進行評分。\n1 分＝非常不滿意，5 分＝非常滿意；若未使用該項服務，請點選「未使用／不適用」。']],
     ['您對本場域整體服務品質的滿意度？', 'rating', 1, null, 1],
     ['您對現場環境整潔與維護狀況的滿意度？', 'rating', 1, null, 1],
     ['您對現場動線安排與指標清楚度的滿意度？', 'rating', 1, null, 1],
