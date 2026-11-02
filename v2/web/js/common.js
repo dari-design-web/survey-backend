@@ -21,7 +21,9 @@
       try {
         const tok = API.getToken();
         if (!tok) return null;
-        const p = JSON.parse(atob(tok.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+        const b64 = tok.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        const bin = atob(b64 + '==='.slice((b64.length + 3) % 4));
+        const p = JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0))));
         return { name: p.name, email: p.email, role: p.role };
       } catch (_) { return null; }
     })();

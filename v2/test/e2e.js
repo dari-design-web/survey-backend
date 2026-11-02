@@ -20,7 +20,7 @@ const server = http.createServer((req, res) => {
   const f = path.join(WEB, p);
   if (!fs.existsSync(f)) { res.writeHead(404); return res.end(); }
   let body = fs.readFileSync(f);
-  if (p.endsWith('config.js')) body = Buffer.from(body.toString().replace('__APPS_SCRIPT_EXEC_URL__', EXEC));
+  if (p.endsWith('config.js')) body = Buffer.from(body.toString().replace(/window.API_BASE = "[^"]*"/, 'window.API_BASE = "' + EXEC + '"'));
   const type = p.endsWith('.html') ? 'text/html' : p.endsWith('.js') ? 'application/javascript' : 'text/plain';
   res.writeHead(200, { 'Content-Type': type + '; charset=utf-8' });
   res.end(body);
@@ -149,7 +149,7 @@ function check(name, cond, extra) { results.push([name, !!cond]); console.log((c
     const m = body.match(/.{0,30}(失敗|Error|錯誤：).{0,30}/);
     check(`後台 ${p} 頁無錯誤`, !m, m && m[0].replace(/\s+/g, ' '));
   }
-  check('系統版本顯示', (await page.textContent('#sysInfo')).includes('3.1.0'));
+  check('系統版本顯示', (await page.textContent('#sysInfo')).includes('3.1.1'));
 
   check('頁面無 JavaScript 例外', errors.length === 0, errors.join(' | '));
   await browser.close();

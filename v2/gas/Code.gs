@@ -11,7 +11,7 @@
  * 版本：見 CODE_VERSION。原始碼來源：GitHub dari-design-web/survey-backend /v2/gas/
  */
 
-var CODE_VERSION = '3.1.0';
+var CODE_VERSION = '3.1.1';
 var GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/dari-design-web/survey-backend/main/v2/gas/';
 var TZ = 'Asia/Taipei';
 var JWT_TTL_HOURS = 8;
@@ -194,6 +194,7 @@ var Store = (function () {
 
   function insertMany(name, objs) {
     if (!objs.length) return [];
+    touch(name);
     var t = prep(name);
     var startRow = t.sh.getLastRow() + 1;
     var rows = objs.map(function (o) {
@@ -213,6 +214,7 @@ var Store = (function () {
   function insert(name, obj) { return insertMany(name, [obj])[0]; }
 
   function update(name, id, patch) {
+    touch(name);
     var t = prep(name);
     var it = get(name, id);
     if (!it) return null;
@@ -222,6 +224,7 @@ var Store = (function () {
   }
 
   function remove(name, id) {
+    touch(name);
     var t = prep(name);
     id = Number(id);
     var r = t.rowOf[id];
@@ -234,9 +237,24 @@ var Store = (function () {
 
   function reset() { cache = {}; }
 
+  // 問卷、題目、贈品有變動 → 讓公開頁快取失效
+  function touch(name) {
+    if (name === 'surveys' || name === 'survey_questions' || name === 'gifts') bumpPublicCache();
+  }
+
   return { all: all, get: get, find: find, findOne: findOne, insert: insert,
            insertMany: insertMany, update: update, remove: remove, reset: reset, sheet: sheet };
 })();
+
+// ============================================================
+// 公開頁快取（問卷列表、問卷內容）：減少讀試算表的次數
+// ============================================================
+function publicCacheGen() {
+  try { return CacheService.getScriptCache().get('pubgen') || '0'; } catch (e) { return '0'; }
+}
+function bumpPublicCache() {
+  try { CacheService.getScriptCache().put('pubgen', String(Date.now()) + Math.random(), 21600); } catch (e) { /* ignore */ }
+}
 
 function SCHEMA_FILL(name, o) {
   Object.keys(SCHEMA[name]).forEach(function (f) { if (!o.hasOwnProperty(f)) o[f] = null; });
@@ -1750,8 +1768,8 @@ function seedDemo() {
 var ROUTES = [
   // [method, regex, handler, roles(null=公開), write(需鎖)]
   ['GET', /^\/api\/health$/, function () { return { ok: true, version: CODE_VERSION }; }, null, false],
-  ['GET', /^\/api\/public\/surveys$/, apiListSurveys, null, false],
-  ['GET', /^\/api\/public\/surveys\/(\d+)$/, apiGetSurvey, null, false],
+  ['GET', /^\/api\/public\/surveys$/, apiListSurveys, null, false, true],
+  ['GET', /^\/api\/public\/surveys\/(\d+)$/, apiGetSurvey, null, false, true],
   ['GET', /^\/api\/public\/coupons\/([^/]+)$/, apiGetCoupon, null, false],
   ['GET', /^\/api\/public\/my-coupons$/, apiMyCoupons, null, false],
   ['GET', /^\/api\/public\/precheck\/(\d+)$/, apiPrecheck, null, false],
@@ -1825,7 +1843,15 @@ function dispatch(req) {
     if (!ctx.user) return { status: 401, body: { error: 'Unauthorized' } };
     if (route[3].indexOf(ctx.user.role) < 0) return { status: 403, body: { error: 'Forbidden' } };
   }
-  var lock = null;
+  var lock = null, cacheKey = null;
+  if (route[5]) {
+    // 起訖日以台灣日期判斷，日期加進快取鍵，跨日自動失效
+    cacheKey = 'pub:' + publicCacheGen() + ':' + tpeDate() + ':' + full;
+    try {
+      var hit = CacheService.getScriptCache().get(cacheKey);
+      if (hit) return JSON.parse(hit);
+    } catch (e0) { /* ignore */ }
+  }
   try {
     if (route[4]) {
       lock = LockService.getScriptLock();
@@ -1835,7 +1861,11 @@ function dispatch(req) {
     }
     var body = route[2](ctx, m);
     if (lock) SpreadsheetApp.flush();
-    return { status: 200, body: body };
+    var out = { status: 200, body: body };
+    if (cacheKey) {
+      try { var str_ = JSON.stringify(out); if (str_.length < 90000) CacheService.getScriptCache().put(cacheKey, str_, 300); } catch (e1) { /* ignore */ }
+    }
+    return out;
   } catch (e) {
     if (e instanceof HttpError) return { status: e.status, body: { ok: false, error: e.message, message: e.message } };
     console.error(e && e.stack || e);
