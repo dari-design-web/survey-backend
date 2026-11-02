@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>填寫問卷</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="config.js?v=3.3.0"></script>
-<script src="js/common.js?v=3.3.0"></script>
-<script src="js/api.js?v=3.3.0"></script>
+<script src="config.js?v=3.3.1"></script>
+<script src="js/common.js?v=3.3.1"></script>
+<script src="js/api.js?v=3.3.1"></script>
 <style>.qtext{white-space:pre-line}.other-input{flex:1;min-width:0;border:0;border-bottom:1px solid var(--edge);padding:4px 8px;background:transparent}.submit-bar{position:sticky;bottom:0;background:var(--paper);padding:16px 0;border-top:1px solid var(--line);margin-top:28px;z-index:10}</style>
 </head>
 <body>
@@ -194,7 +194,13 @@ function evaluateAllConditions() {
     });
 
     // 啟用 Google 登入時：未登入先顯示登入卡，不顯示題目
-    if (precheck?.ok && precheck.need_login) {
+    // 預檢失敗時改讀公開設定：需登入但本機沒有登入憑證 → 一樣先顯示登入
+    let needLogin = !!(precheck?.ok && precheck.need_login);
+    if (!precheck?.ok) {
+      const cfg = await publicConfig().catch(() => null);
+      if (cfg?.login_required && !getCustomerToken()) needLogin = true;
+    }
+    if (needLogin) {
       root.innerHTML = `<header style="margin-top:20px">
         ${survey.location_name ? `<p class="eyebrow">${esc(survey.location_name)}</p>` : ''}
         <h1 class="serif" style="margin:12px 0">${esc(survey.title)}</h1></header><div id="loginBox"></div>`;

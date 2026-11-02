@@ -6,18 +6,24 @@
 <title>編輯問卷</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
-<script src="../config.js?v=3.3.0"></script>
-<script src="../js/common.js?v=3.3.0"></script>
-<script src="../js/api.js?v=3.3.0"></script>
+<script src="../config.js?v=3.3.1"></script>
+<script src="../js/common.js?v=3.3.1"></script>
+<script src="../js/api.js?v=3.3.1"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
 <script>renderAdminHeader('surveys');</script>
 <main class="max-w-5xl mx-auto px-4 sm:px-6 py-6">
-  <h1 id="title" class="text-2xl font-bold mb-5">新增問卷</h1>
+  <h1 id="title" class="text-2xl font-bold mb-3">新增問卷</h1>
+  <nav aria-label="頁內導覽" class="flex flex-wrap gap-2 mb-5 text-sm">
+    <a href="#sec_basic" class="px-3 py-2 rounded-full border bg-white hover:bg-brand-50">基本設定</a>
+    <a href="#sec_gift" class="px-3 py-2 rounded-full border bg-white hover:bg-brand-50">贈品與兌換</a>
+    <a href="#sec_done" class="px-3 py-2 rounded-full border bg-white hover:bg-brand-50">完成頁</a>
+    <a href="#qsec" class="px-3 py-2 rounded-full border bg-white hover:bg-brand-50">題目清單</a>
+  </nav>
 
-  <div class="bg-white rounded-xl border p-5 mb-5">
+  <div id="sec_basic" class="bg-white rounded-xl border p-5 sm:p-6 mb-6 scroll-mt-4">
     <h2 class="font-bold mb-3 text-slate-700">基本設定</h2>
-    <div class="grid md:grid-cols-2 gap-4 text-sm">
+    <div class="grid md:grid-cols-2 gap-5 text-sm">
       <label class="block"><span class="text-slate-700">問卷名稱 <span class="text-red-500">*</span></span>
         <input id="f_title" class="mt-1 w-full border rounded px-3 py-2"></label>
       <label class="block"><span class="text-slate-700">場域名稱</span>
@@ -29,7 +35,14 @@
       <label class="block"><span class="text-slate-700">結束日期</span>
         <input id="f_end" type="date" class="mt-1 w-full border rounded px-3 py-2"></label>
       <label class="flex items-center gap-2"><input id="f_active" type="checkbox" checked class="rounded">啟用問卷</label>
-      <label class="flex items-center gap-2"><input id="f_genCoupon" type="checkbox" checked class="rounded">完成後產生兌換券</label>
+    </div>
+  </div>
+
+  <div id="sec_gift" class="bg-white rounded-xl border p-5 sm:p-6 mb-6 scroll-mt-4">
+    <h2 class="font-bold mb-3 text-slate-700">贈品與兌換</h2>
+    <p class="text-sm text-slate-500 -mt-1 mb-3">兌換券、贈品庫存與兌換規則。</p>
+    <div class="grid md:grid-cols-2 gap-5 text-sm">
+      <label class="flex items-center gap-2 md:col-span-2"><input id="f_genCoupon" type="checkbox" checked class="rounded">完成後產生兌換券</label>
       <label class="block md:col-span-2"><span class="text-slate-700">🎁 贈品（發券時會預扣這個贈品的庫存；可發數量為 0 時，民眾仍可填答但不發券）</span>
         <select id="f_gift" class="mt-1 w-full border rounded px-3 py-2"><option value="">不控管庫存（不限量發券）</option></select>
         <span class="text-xs text-slate-500 mt-1 block">贈品兌換完要換新款：到「贈品庫存」新增贈品並入庫，再回來這裡切換即可。</span></label>
@@ -54,6 +67,13 @@
           📌 不同問卷請設不同前綴，從序號就能一眼分辨是哪份問卷的券。
         </span>
       </label>
+    </div>
+  </div>
+
+  <div id="sec_done" class="bg-white rounded-xl border p-5 sm:p-6 mb-6 scroll-mt-4">
+    <h2 class="font-bold mb-3 text-slate-700">完成頁</h2>
+    <p class="text-sm text-slate-500 -mt-1 mb-3">民眾送出問卷後看到的內容。</p>
+    <div class="grid md:grid-cols-2 gap-5 text-sm">
       <label class="block md:col-span-2"><span class="text-slate-700">送出完成頁文字（可多行）</span>
         <textarea id="f_thank" rows="3" class="mt-1 w-full border rounded px-3 py-2"></textarea></label>
 
@@ -77,14 +97,15 @@
         </p>
       </div>
     </div>
-    <div class="mt-4 flex gap-2">
-      <button id="saveBtn" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded font-bold text-sm">建立問卷</button>
+    <div class="mt-5 pt-4 border-t flex flex-wrap items-center gap-3">
+      <span class="text-sm text-slate-500">「建立／儲存設定」會一起儲存上面三張卡的設定；題目另在下方儲存。</span>
+      <button id="saveBtn" class="bg-brand-600 hover:bg-brand-700 text-white px-5 py-3 rounded font-bold">建立問卷</button>
       <a href="surveys.html" class="px-4 py-2 text-sm text-slate-600">取消</a>
     </div>
     <p id="msg" class="mt-2 text-sm"></p>
   </div>
 
-  <div id="qsec" class="bg-white rounded-xl border p-5 hidden">
+  <div id="qsec" class="bg-white rounded-xl border p-5 sm:p-6 hidden scroll-mt-4">
     <!-- 頂部按鈕：sticky 黏在頁面上緣 -->
     <div class="sticky top-0 -mx-5 -mt-5 px-5 py-3 mb-4 bg-white border-b border-slate-200 z-30 flex flex-wrap justify-between items-center gap-2">
       <h2 class="font-bold text-slate-700">題目清單</h2>

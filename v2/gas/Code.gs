@@ -11,7 +11,7 @@
  * 版本：見 CODE_VERSION。原始碼來源：GitHub dari-design-web/survey-backend /v2/gas/
  */
 
-var CODE_VERSION = '3.3.0';
+var CODE_VERSION = '3.3.1';
 var GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/dari-design-web/survey-backend/main/v2/gas/';
 var TZ = 'Asia/Taipei';
 var JWT_TTL_HOURS = 8;
@@ -76,7 +76,7 @@ var SCHEMA = {
   },
   coupon_sequences: { id: 'n', seq_key: 's', seq: 'n' },
   // 贈品圖片（方形 JPEG，前端已縮小）：base64 依 45,000 字元切段存放，避開儲存格上限
-  gift_images: { id: 'n', gift_id: 'n', seq: 'n', data: 's', created_at: 's' }
+  gift_images: { id: 'n', gift_id: 'n', ver: 's', seq: 'n', data: 's', created_at: 's' }
 };
 
 // ============================================================
@@ -725,9 +725,21 @@ function apiGoogleLogin(ctx) {
   if (p.iss !== 'accounts.google.com' && p.iss !== 'https://accounts.google.com') fail(401, 'Google 登入驗證失敗');
   if (!p.exp || Number(p.exp) * 1000 < Date.now()) fail(401, 'Google 登入已逾時，請重新登入');
   if (!p.sub) fail(401, 'Google 登入驗證失敗');
+  // 只接受 Google 已驗證 Email 的帳號（帳號鍵仍是 sub，不以 Email 識別）
+  if (!(p.email_verified === true || p.email_verified === 'true')) fail(401, '此 Google 帳號的 Email 尚未驗證，請改用其他帳號');
   var key = 'google:' + sha256Hex('google|' + p.sub).slice(0, 40);
-  var u = Store.findOne('users', function (x) { return x.external_id === key; }) ||
-    Store.insert('users', { external_id: key, name: 'Google 使用者', phone: null, email: null, created_at: nowIso() });
+  // 驗證向 Google 查詢較慢，放在鎖外；只有建立使用者時才取得鎖，避免拖慢發券與核銷
+  var u = Store.findOne('users', function (x) { return x.external_id === key; });
+  if (!u) {
+    var lock = LockService.getScriptLock();
+    if (!lock.tryLock(25000)) fail(503, '目前使用人數較多，請稍後再試一次');
+    try {
+      Store.reset();
+      u = Store.findOne('users', function (x) { return x.external_id === key; }) ||
+        Store.insert('users', { external_id: key, name: 'Google 使用者', phone: null, email: null, created_at: nowIso() });
+      SpreadsheetApp.flush();
+    } finally { lock.releaseLock(); }
+  }
   return { ok: true, ctoken: signCustomer(u) };
 }
 
@@ -774,10 +786,11 @@ function apiPrecheck(ctx, m) {
   var s = Store.get('surveys', Number(m[1]));
   var st = surveyOpenState(s);
   if (st !== 'open') fail(404, CLOSED_MSG[st]);
-  if (!s.generate_coupon) return { ok: true, eligible: true, generate_coupon: false };
-  var stockOk = giftAvailableForSurvey(s).ok;
   var u = resolveUser(ctx, ctx.query.deviceId, false);
-  var out = { ok: true, generate_coupon: true, login_required: loginRequired() };
+  var needLogin = loginRequired() && !u;
+  if (!s.generate_coupon) return { ok: true, eligible: true, generate_coupon: false, login_required: loginRequired(), need_login: needLogin };
+  var stockOk = giftAvailableForSurvey(s).ok;
+  var out = { ok: true, generate_coupon: true, login_required: loginRequired(), need_login: needLogin };
   if (u) {
     var r = checkEligibility(u.id, s.id);
     if (!r.eligible) {
@@ -793,7 +806,6 @@ function apiPrecheck(ctx, m) {
     return out;
   }
   out.eligible = u ? true : 'new';
-  if (loginRequired() && !u) out.need_login = true;
   return out;
 }
 
@@ -1391,17 +1403,35 @@ function apiGiftImageUpload(ctx, m) {
   var data = str((ctx.body || {}).data_url);
   if (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(data)) fail(400, '圖片格式不正確（請上傳 JPG、PNG 或 WebP）');
   if (data.length > 120000) fail(400, '圖片太大，請重新選擇（系統會自動縮小，若仍失敗請換一張）');
-  removeGiftImage(id);
+  checkImageBytes(data);
+  // 先寫入新版分段，成功後才切換現行版本，最後清掉舊版；中途失敗時舊圖仍可使用
+  var ver = String(Date.now());
   var chunks = [];
-  for (var i = 0; i < data.length; i += 45000) chunks.push({ gift_id: id, seq: chunks.length, data: data.slice(i, i + 45000), created_at: nowIso() });
+  for (var i = 0; i < data.length; i += 45000) chunks.push({ gift_id: id, ver: ver, seq: chunks.length, data: data.slice(i, i + 45000), created_at: nowIso() });
   Store.insertMany('gift_images', chunks);
-  Store.update('gifts', id, { image_version: String(Date.now()), updated_at: nowIso() });
+  Store.update('gifts', id, { image_version: ver, updated_at: nowIso() });
+  removeGiftImage(id, ver);
   audit(ctx, 'gift_image_upload', 'gift', id, { bytes: data.length });
   return { ok: true, gift: giftRow(Store.get('gifts', id)) };
 }
 
-function removeGiftImage(id) {
-  Store.find('gift_images', function (x) { return x.gift_id === id; }).map(function (x) { return x.id; })
+/** 檢查解碼後的檔頭與宣告格式一致（JPEG／PNG／WebP） */
+function checkImageBytes(dataUrl) {
+  var mime = dataUrl.slice(5, dataUrl.indexOf(';'));
+  var b;
+  try { b = Utilities.base64Decode(dataUrl.slice(dataUrl.indexOf(',') + 1)); } catch (e) { fail(400, '圖片內容無法讀取，請換一張'); }
+  var u = function (i) { return b[i] & 0xff; };
+  var asc = function (i, n) { var t = ''; for (var k = 0; k < n; k++) t += String.fromCharCode(u(i + k)); return t; };
+  var ok = b.length > 32 && (
+    (mime === 'image/jpeg' && u(0) === 0xff && u(1) === 0xd8 && u(2) === 0xff) ||
+    (mime === 'image/png' && u(0) === 0x89 && asc(1, 3) === 'PNG') ||
+    (mime === 'image/webp' && asc(0, 4) === 'RIFF' && asc(8, 4) === 'WEBP'));
+  if (!ok) fail(400, '圖片內容與格式不符，請換一張');
+}
+
+/** 刪除贈品圖片分段；keepVer 有值時保留該版本 */
+function removeGiftImage(id, keepVer) {
+  Store.find('gift_images', function (x) { return x.gift_id === id && (!keepVer || x.ver !== keepVer); }).map(function (x) { return x.id; })
     .forEach(function (rid) { Store.remove('gift_images', rid); });
 }
 
@@ -1416,9 +1446,13 @@ function apiGiftImageDelete(ctx, m) {
 
 function apiGiftImage(ctx, m) {
   var id = Number(m[1]);
-  var parts = Store.find('gift_images', function (x) { return x.gift_id === id; }).sort(function (a, b) { return a.seq - b.seq; });
-  if (!parts.length) fail(404, 'not_found');
   var g = Store.get('gifts', id) || {};
+  if (!g.image_version) fail(404, 'not_found');
+  var mine = Store.find('gift_images', function (x) { return x.gift_id === id; });
+  var parts = mine.filter(function (x) { return x.ver === g.image_version; });
+  if (!parts.length) parts = mine.filter(function (x) { return !x.ver; });   // 3.3.0 舊資料沒有版本欄
+  parts.sort(function (a, b) { return a.seq - b.seq; });
+  if (!parts.length) fail(404, 'not_found');
   return { ok: true, data_url: parts.map(function (p) { return p.data; }).join(''), version: g.image_version || null };
 }
 
@@ -1999,7 +2033,7 @@ var ROUTES = [
   ['GET', /^\/api\/public\/precheck\/(\d+)$/, apiPrecheck, null, false],
   ['POST', /^\/api\/public\/survey$/, apiSubmitSurvey, null, true],
   ['GET', /^\/api\/public\/config$/, apiPublicConfig, null, false, true],
-  ['POST', /^\/api\/public\/login\/google$/, apiGoogleLogin, null, true],
+  ['POST', /^\/api\/public\/login\/google$/, apiGoogleLogin, null, false],
   ['GET', /^\/api\/public\/gift-image\/(\d+)$/, apiGiftImage, null, false, true],
   ['POST', /^\/api\/auth\/login$/, apiLogin, null, true],
   ['GET', /^\/api\/auth\/me$/, function (ctx) { return { user: ctx.user }; }, ROLES_ALL, false],

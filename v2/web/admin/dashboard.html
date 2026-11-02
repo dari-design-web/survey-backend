@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>儀表板</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="../config.js?v=3.3.0"></script>
-<script src="../js/common.js?v=3.3.0"></script>
-<script src="../js/api.js?v=3.3.0"></script>
+<script src="../config.js?v=3.3.1"></script>
+<script src="../js/common.js?v=3.3.1"></script>
+<script src="../js/api.js?v=3.3.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   body{font-family:'Noto Sans TC',sans-serif}
@@ -69,33 +69,10 @@
     </div>
     <div class="bg-white rounded-xl border p-4">
       <div class="flex items-center justify-between mb-3">
-        <h3 class="text-sm font-bold">每月填寫趨勢（近 12 個月）</h3>
-        <button onclick="dl('monthly-trend')" class="dl-btn">📥 下載</button>
-      </div>
-      <canvas id="monthlyChart" height="120"></canvas>
-    </div>
-    <div class="bg-white rounded-xl border p-4">
-      <div class="flex items-center justify-between mb-3">
         <h3 class="text-sm font-bold">各項滿意度平均</h3>
         <button onclick="dl('satisfaction-avg')" class="dl-btn">📥 下載</button>
       </div>
       <canvas id="satChart" height="180"></canvas>
-    </div>
-    <div class="bg-white rounded-xl border p-4">
-      <div class="flex items-center justify-between mb-1">
-        <h3 class="text-sm font-bold">滿意度評分分布（1-5 分，%）</h3>
-        <button onclick="dl('score-distribution')" class="dl-btn">📥 下載</button>
-      </div>
-      <p class="text-[11px] text-slate-500 mb-2">彙總所有滿意度評分題（Q6~Q14）的填答分布</p>
-      <canvas id="distChart" height="160"></canvas>
-    </div>
-    <div class="bg-white rounded-xl border p-4 md:col-span-2">
-      <div class="flex flex-wrap items-center gap-4 mb-3">
-        <h3 class="text-sm font-bold">NPS 推薦分數分布(0-10 分，%)</h3>
-        <div id="npsSummary" class="text-xs text-slate-600 flex flex-wrap gap-3 flex-1"></div>
-        <button onclick="dl('nps-distribution')" class="dl-btn">📥 下載</button>
-      </div>
-      <canvas id="npsChart" height="80"></canvas>
     </div>
     <div class="bg-white rounded-xl border p-4">
       <div class="flex items-center justify-between mb-3">
@@ -116,6 +93,34 @@
       <canvas id="kwChart" height="160"></canvas>
     </div>
   </div>
+  <details id="moreStats" class="mt-5 bg-white rounded-xl border">
+    <summary class="cursor-pointer select-none px-4 py-3 font-bold text-slate-700" style="min-height:44px">更多統計（每月趨勢、評分分布、NPS）</summary>
+    <div class="grid md:grid-cols-2 gap-5 p-4 pt-0">
+      <div class="bg-white rounded-xl border p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-bold">每月填寫趨勢（近 12 個月）</h3>
+          <button onclick="dl('monthly-trend')" class="dl-btn">📥 下載</button>
+        </div>
+        <canvas id="monthlyChart" height="120"></canvas>
+      </div>
+      <div class="bg-white rounded-xl border p-4">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="text-sm font-bold">滿意度評分分布（1-5 分，%）</h3>
+          <button onclick="dl('score-distribution')" class="dl-btn">📥 下載</button>
+        </div>
+        <p class="text-[11px] text-slate-500 mb-2">彙總所有滿意度評分題（Q6~Q14）的填答分布</p>
+        <canvas id="distChart" height="160"></canvas>
+      </div>
+      <div class="bg-white rounded-xl border p-4 md:col-span-2">
+        <div class="flex flex-wrap items-center gap-4 mb-3">
+          <h3 class="text-sm font-bold">NPS 推薦分數分布(0-10 分，%)</h3>
+          <div id="npsSummary" class="text-xs text-slate-600 flex flex-wrap gap-3 flex-1"></div>
+          <button onclick="dl('nps-distribution')" class="dl-btn">📥 下載</button>
+        </div>
+        <canvas id="npsChart" height="80"></canvas>
+      </div>
+    </div>
+  </details>
 
   <!-- 問卷分項統計（依該問卷所有單選/複選/下拉題自動產生） -->
   <div class="bg-white rounded-xl border p-4 mt-5">
@@ -467,22 +472,31 @@ function resetChartSlots() {
   });
 }
 
+document.addEventListener('toggle', e => {
+  if (e.target.id === 'moreStats' && e.target.open && window.Chart) {
+    e.target.querySelectorAll('canvas').forEach(cv => { const ch = Chart.getChart(cv); if (ch) ch.resize(); });
+  }
+}, true);
+
 function renderDashboard(data) {
   resetChartSlots();
 
   const c = data.cards;
-  const cards = [
-    ['總問卷數', c.totalResponses, 'text-blue-700'],
-    ['今日填寫', c.todayResponses, 'text-emerald-700'],
-    ['本月填寫', c.monthResponses, 'text-sky-700'],
-    ['平均整體滿意度', c.overallAvg != null ? c.overallAvg + ' / 5' : '—', 'text-brand-700'],
-    ['產生兌換券數', c.totalCoupons, 'text-slate-700'],
-    ['已兌換', c.redeemedCoupons, 'text-green-700'],
-    ['未兌換', c.issuedCoupons, 'text-amber-700'],
-    ['兌換率', c.redemptionRate + '%', 'text-purple-700'],
+  const primary = [
+    ['總問卷數', c.totalResponses],
+    ['本月填寫', c.monthResponses],
+    ['未兌換（有效券）', c.issuedCoupons],
+    ['已兌換', c.redeemedCoupons],
   ];
-  document.getElementById('cards').innerHTML = cards.map(([k, v, cls]) =>
-    `<div class="bg-white rounded-xl border p-4"><div class="text-xs text-slate-500 mb-1">${k}</div><div class="text-2xl font-bold ${cls}">${v}</div></div>`).join('');
+  const secondary = [
+    ['今日填寫', c.todayResponses],
+    ['平均整體滿意度', c.overallAvg != null ? c.overallAvg + ' / 5' : '—'],
+    ['產生兌換券數', c.totalCoupons],
+    ['兌換率', c.redemptionRate + '%'],
+  ];
+  document.getElementById('cards').innerHTML =
+    primary.map(([k, v]) => `<div class="bg-white rounded-xl border p-5"><div class="text-sm text-slate-500 mb-1">${k}</div><div class="text-3xl font-bold text-brand-700">${v}</div></div>`).join('') +
+    secondary.map(([k, v]) => `<div class="bg-white/70 rounded-xl border border-dashed p-3"><div class="text-sm text-slate-500">${k}</div><div class="text-xl font-bold text-slate-700">${v}</div></div>`).join('');
   if (c.monthNegative > 0) {
     // 帶上 survey_id + 日期區間（沒設就用本月）+ max_score=2
     const now = new Date();

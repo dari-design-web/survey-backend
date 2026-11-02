@@ -469,7 +469,7 @@ function googleEnv(sub) {
     if (url.indexOf('tokeninfo') >= 0) {
       const tok = decodeURIComponent(url.split('id_token=')[1]);
       if (tok === 'bad') return { getResponseCode: () => 400, getContentText: () => '{}' };
-      return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ aud: '123-abc.apps.googleusercontent.com', iss: 'https://accounts.google.com', exp: String(Math.floor(Date.now() / 1000) + 600), sub: tok }) };
+      return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ aud: '123-abc.apps.googleusercontent.com', iss: 'https://accounts.google.com', exp: String(Math.floor(Date.now() / 1000) + 600), sub: tok, email_verified: tok.indexOf('unverified') >= 0 ? 'false' : 'true' }) };
     }
     throw new Error('no network');
   } } });
@@ -510,7 +510,7 @@ test('Google 登入：啟用後未登入不能送出；登入後依帳號限領�
 test('贈品圖片：上傳、分段儲存、公開讀取、格式與大小檢查、刪除', () => {
   const c = boot();
   const gid = c.ids.gift_id;
-  const big = 'data:image/jpeg;base64,' + 'A'.repeat(100000);
+  const big = 'data:image/jpeg;base64,/9j/' + 'A'.repeat(99996);
   const up = api(c.env, 'POST', '/api/admin/gifts/' + gid + '/image', { data_url: big }, c.T);
   assert.strictEqual(up.status, 200, JSON.stringify(up.body));
   c.env.Store.reset();
@@ -522,6 +522,44 @@ test('贈品圖片：上傳、分段儲存、公開讀取、格式與大小檢�
   assert.strictEqual(api(c.env, 'POST', '/api/admin/gifts/' + gid + '/image', { data_url: 'data:image/jpeg;base64,' + 'A'.repeat(130000) }, c.T).status, 400);
   api(c.env, 'DELETE', '/api/admin/gifts/' + gid + '/image', null, c.T);
   assert.strictEqual(api(c.env, 'GET', '/api/public/gift-image/' + gid).status, 404);
+});
+
+test('G11 修正：登入旗標、Email 驗證、圖片內容檢查、更新失敗保留舊圖', () => {
+  // F1：無贈品、缺貨時也帶 need_login
+  const g = googleEnv();
+  g.env.dispatch({ method: 'POST', path: '/api/admin/system/google', body: { client_id: '123-abc.apps.googleusercontent.com' }, token: g.T });
+  const pre = () => g.env.dispatch({ method: 'GET', path: '/api/public/precheck/' + g.ids.survey_id + '?deviceId=x' }).body;
+  assert.strictEqual(pre().need_login, true);
+  g.env.Store.reset(); g.env.Store.update('surveys', g.ids.survey_id, { gift_id: null, generate_coupon: 0 });
+  const p2 = pre();
+  assert.strictEqual(p2.need_login, true, JSON.stringify(p2));
+  // F3：Email 未驗證拒絕
+  assert.strictEqual(g.env.dispatch({ method: 'POST', path: '/api/public/login/google', body: { credential: 'unverified-1' } }).status, 401);
+  assert.strictEqual(g.env.dispatch({ method: 'POST', path: '/api/public/login/google', body: { credential: 'ok-1' } }).status, 200);
+
+  const c = boot();
+  const gid = c.ids.gift_id;
+  const up = d => api(c.env, 'POST', '/api/admin/gifts/' + gid + '/image', { data_url: d }, c.T);
+  // F6：宣告 PNG 但內容不是 PNG → 拒絕；真 PNG 檔頭 → 接受
+  assert.strictEqual(up('data:image/png;base64,' + Buffer.from('Hello world, this is not an image at all!').toString('base64')).status, 400);
+  const png = 'data:image/png;base64,' + Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(60)]).toString('base64');
+  assert.strictEqual(up(png).status, 200);
+  const webp = 'data:image/webp;base64,' + Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WEBP'), Buffer.alloc(40)]).toString('base64');
+  // F2：新圖寫入失敗時，舊圖仍在
+  c.env.Store.reset();
+  const orig = c.env.Store.insertMany;
+  c.env.Store.insertMany = function (name) { if (name === 'gift_images') throw new Error('寫入失敗'); return orig.apply(this, arguments); };
+  assert.strictEqual(up(webp).status, 500);
+  c.env.Store.insertMany = orig;
+  c.env.Store.reset();
+  const still = api(c.env, 'GET', '/api/public/gift-image/' + gid);
+  assert.strictEqual(still.status, 200);
+  assert.strictEqual(still.body.data_url, png);
+  // 重試成功後只留新版
+  assert.strictEqual(up(webp).status, 200);
+  c.env.Store.reset();
+  assert.strictEqual(api(c.env, 'GET', '/api/public/gift-image/' + gid).body.data_url, webp);
+  assert.ok(c.env.Store.all('gift_images').every(x => x.data === webp || webp.indexOf(x.data) >= 0));
 });
 
 console.log('\n後台與匯出');
