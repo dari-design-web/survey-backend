@@ -276,6 +276,23 @@ test('換新贈品：新增贈品並切換問卷 → 新券掛新贈品', () => 
   assert.strictEqual(c.env.giftStock(g2.id).available, 49);
 });
 
+test('兌換期限 24 小時：逾時未兌換自動取消並回補庫存', () => {
+  const c = boot();
+  const cp = submit(c, 'devA').body.coupon;
+  const hrs = (new Date(cp.expires_at) - new Date(cp.issued_at)) / 3600000;
+  assert.strictEqual(hrs, 24);
+  assert.strictEqual(c.env.giftStock(c.ids.gift_id).available, 19);
+  c.env.Store.update('coupons', cp.id, { expires_at: new Date(Date.now() - 1).toISOString() });
+  assert.strictEqual(c.env.giftStock(c.ids.gift_id).available, 20);
+  const lk = api(c.env, 'GET', '/api/redeem/lookup?code=' + cp.coupon_code, null, c.T).body.coupon;
+  assert.strictEqual(lk.status, 'expired');
+  // 後台可改期限（小時）
+  const sv = api(c.env, 'GET', '/api/admin/surveys/' + c.ids.survey_id, null, c.T).body.survey;
+  api(c.env, 'PUT', '/api/admin/surveys/' + sv.id, Object.assign({}, sv, { coupon_valid_hours: 2 }), c.T);
+  const cp2 = submit(c, 'devB').body.coupon;
+  assert.strictEqual((new Date(cp2.expires_at) - new Date(cp2.issued_at)) / 3600000, 2);
+});
+
 console.log('\n後台與匯出');
 test('儀表板、意見、兌換券列表、我的兌換券', () => {
   const c = boot();

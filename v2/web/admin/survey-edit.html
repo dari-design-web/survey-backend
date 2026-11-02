@@ -35,8 +35,8 @@
       <label class="block md:col-span-2"><span class="text-slate-700">🎁 贈品（發券時會預扣這個贈品的庫存；可發數量為 0 時，民眾仍可填答但不發券）</span>
         <select id="f_gift" class="mt-1 w-full border rounded px-3 py-2"><option value="">不控管庫存（不限量發券）</option></select>
         <span class="text-xs text-slate-500 mt-1 block">贈品兌換完要換新款：到「贈品庫存」新增贈品並入庫，再回來這裡切換即可。</span></label>
-      <label class="block"><span class="text-slate-700">兌換券有效天數</span>
-        <input id="f_validDays" type="number" min="1" value="30" class="mt-1 w-full border rounded px-3 py-2"></label>
+      <label class="block"><span class="text-slate-700">兌換期限（小時，逾時自動取消並回補庫存）</span>
+        <input id="f_validDays" type="number" min="1" value="24" class="mt-1 w-full border rounded px-3 py-2"></label>
       <label class="block"><span class="text-slate-700">兌換間隔（天）</span>
         <input id="f_interval" type="number" min="0" value="30" class="mt-1 w-full border rounded px-3 py-2"></label>
       <label class="block md:col-span-2"><span class="text-slate-700">兌換地點說明</span>
@@ -162,7 +162,7 @@ function readForm() {
     next_action_label: f_nextLabel.value.trim(),
     next_action_url: f_nextUrl.value.trim(),
     next_action_hint: f_nextHint.value.trim(),
-    coupon_valid_days: +f_validDays.value, redemption_interval_days: +f_interval.value,
+    coupon_valid_hours: +f_validDays.value, redemption_interval_days: +f_interval.value,
     redemption_location: f_redLoc.value.trim(),
     coupon_title: f_ctitle.value.trim(), coupon_subtitle: f_csub.value.trim(),
     coupon_code_prefix: (f_cprefix.value || 'GIFT').trim().toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,5) || 'GIFT',
@@ -205,7 +205,7 @@ async function load() {
   f_active.checked = !!survey.is_active;
   f_genCoupon.checked = !!survey.generate_coupon;
   f_gift.value = survey.gift_id || '';
-  f_validDays.value = survey.coupon_valid_days || 30;
+  f_validDays.value = survey.coupon_valid_hours || (survey.coupon_valid_days ? survey.coupon_valid_days * 24 : 24);
   f_interval.value = survey.redemption_interval_days ?? 30;
   f_redLoc.value = survey.redemption_location || '';
   f_ctitle.value = survey.coupon_title || '贈品兌換券';

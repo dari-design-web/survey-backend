@@ -11,7 +11,7 @@
  * 版本：見 CODE_VERSION。原始碼來源：GitHub dari-design-web/survey-backend /v2/gas/
  */
 
-var CODE_VERSION = '3.0.0';
+var CODE_VERSION = '3.1.0';
 var GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/dari-design-web/survey-backend/main/v2/gas/';
 var TZ = 'Asia/Taipei';
 var JWT_TTL_HOURS = 8;
@@ -25,7 +25,7 @@ var SCHEMA = {
   surveys: {
     id: 'n', title: 's', description: 's', location_name: 's',
     start_date: 's', end_date: 's', is_active: 'n', generate_coupon: 'n',
-    gift_id: 'n', coupon_valid_days: 'n', redemption_interval_days: 'n',
+    gift_id: 'n', coupon_valid_days: 'n', coupon_valid_hours: 'n', redemption_interval_days: 'n',
     redemption_location: 's', coupon_title: 's', coupon_subtitle: 's',
     coupon_code_prefix: 's', thank_you_message: 's',
     next_action_label: 's', next_action_url: 's', next_action_hint: 's',
@@ -472,7 +472,7 @@ function issueCoupon(userId, s, responseId) {
     coupon_code: code, survey_id: s.id, response_id: responseId, user_id: userId,
     gift_id: g ? g.id : null, gift_name: g ? g.name : null, qr_code_value: code,
     status: 'issued', issued_at: now.toISOString(),
-    expires_at: addDays(now, s.coupon_valid_days || 30).toISOString(),
+    expires_at: new Date(now.getTime() + couponValidHours(s) * 3600000).toISOString(),
     redeemed_at: null, redeemed_by: null, voided_at: null, voided_by: null
   });
   Store.insert('redemption_logs', {
@@ -481,6 +481,13 @@ function issueCoupon(userId, s, responseId) {
   });
   if (g) refreshGiftSnapshot(g.id);
   return c;
+}
+
+/** 兌換期限（小時）。預設 24 小時；逾時未兌換即取消，預留自動回到可發庫存 */
+function couponValidHours(s) {
+  if (s.coupon_valid_hours) return s.coupon_valid_hours;
+  if (s.coupon_valid_days) return s.coupon_valid_days * 24;
+  return 24;
 }
 
 function markExpired(c) {
@@ -831,7 +838,8 @@ function surveyPayload(b) {
     start_date: b.start_date || null, end_date: b.end_date || null,
     is_active: bool01(b.is_active), generate_coupon: bool01(b.generate_coupon),
     gift_id: giftId,
-    coupon_valid_days: Math.max(1, parseInt(b.coupon_valid_days, 10) || 30),
+    coupon_valid_hours: Math.max(1, Math.min(24 * 365, parseInt(b.coupon_valid_hours, 10) || 24)),
+    coupon_valid_days: null,
     redemption_interval_days: Math.max(0, isNaN(parseInt(b.redemption_interval_days, 10)) ? 30 : parseInt(b.redemption_interval_days, 10)),
     redemption_location: b.redemption_location || null,
     coupon_title: b.coupon_title || '贈品兌換券',
@@ -1693,9 +1701,9 @@ function seedDemo() {
     title: '民眾滿意度調查問卷',
     description: '親愛的民眾您好：\n感謝您撥冗填寫本問卷。為持續提升本場域之服務品質、環境設施、動線指引與整體使用體驗，誠摯邀請您提供寶貴意見。\n\n本問卷約需 3 分鐘完成，填答內容僅作為服務改善、營運分析及統計研究使用，不會作為其他用途。相關資料將依個人資料保護法及相關規定妥善處理。\n\n完成問卷後，系統將產生贈品兌換券，請依兌換券說明至指定地點兌換。',
     location_name: '林口國家檔案館附屬服務設施', start_date: null, end_date: null, is_active: 1, generate_coupon: 1,
-    gift_id: g.id, coupon_valid_days: 30, redemption_interval_days: 30, redemption_location: '服務台（營業時間 09:00-17:00）',
+    gift_id: g.id, coupon_valid_hours: 24, redemption_interval_days: 30, redemption_location: '服務台（營業時間 09:00-17:00）',
     coupon_title: '民眾滿意度調查贈品兌換券', coupon_subtitle: '感謝您完成滿意度調查', coupon_code_prefix: 'NA',
-    thank_you_message: '感謝您完成本次滿意度調查！\n您的意見將作為我們持續改善服務品質、環境設施與整體體驗的重要參考。\n請出示下方兌換券 QR Code 至指定地點兌換贈品。',
+    thank_you_message: '感謝您完成本次滿意度調查！\n您的意見將作為我們持續改善服務品質、環境設施與整體體驗的重要參考。\n請於 24 小時內出示下方兌換券 QR Code 至指定地點兌換贈品，逾時將自動取消。',
     next_action_label: '', next_action_url: '', next_action_hint: '', created_at: nowIso(), updated_at: nowIso()
   });
   var R = ['非常願意', '願意', '普通', '不太願意', '完全不願意'];
