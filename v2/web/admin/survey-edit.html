@@ -6,9 +6,9 @@
 <title>編輯問卷</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
-<script src="../config.js?v=3.2.0"></script>
-<script src="../js/common.js?v=3.2.0"></script>
-<script src="../js/api.js?v=3.2.0"></script>
+<script src="../config.js?v=3.2.1"></script>
+<script src="../js/common.js?v=3.2.1"></script>
+<script src="../js/api.js?v=3.2.1"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
 <script>renderAdminHeader('surveys');</script>
@@ -92,7 +92,7 @@
           class="bg-slate-200 text-slate-400 cursor-not-allowed px-4 py-1.5 rounded text-sm font-bold transition">
           全部已儲存 ✓
         </button>
-        <button onclick="addQ('section')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded text-sm font-bold">+ 章節</button>
+        <button onclick="addQ('section')" class="bg-brand-600 hover:bg-brand-700 text-white px-3 py-1.5 rounded text-sm font-bold">+ 章節</button>
         <button onclick="addQ('single')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-sm font-bold">+ 新增題目</button>
       </div>
     </div>
@@ -109,7 +109,7 @@
         class="bg-slate-200 text-slate-400 cursor-not-allowed px-4 py-2 rounded text-sm font-bold">
         全部已儲存 ✓
       </button>
-      <button onclick="addQ('section')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm font-bold">+ 章節</button>
+      <button onclick="addQ('section')" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded text-sm font-bold">+ 章節</button>
       <button onclick="addQ('single')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded text-sm font-bold">+ 新增題目</button>
     </div>
   </div>
@@ -122,7 +122,7 @@
     💾
   </button>
   <button onclick="addQ('section')" title="新增章節"
-    class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg w-12 h-12 text-lg font-bold flex items-center justify-center transition-transform hover:scale-105 active:scale-95">
+    class="bg-brand-600 hover:bg-brand-700 text-white rounded-full shadow-lg w-12 h-12 text-lg font-bold flex items-center justify-center transition-transform hover:scale-105 active:scale-95">
     §
   </button>
   <button onclick="addQ('single')" title="新增題目"
@@ -237,11 +237,11 @@ function questionHTML(q) {
   const optLabel = isSection ? '章節說明文字（顯示在標題下方）' : '選項（每行一個；含「其他」者前台自動加文字欄）';
   const showOpts = HAS_OPTIONS.has(q.question_type);
   const qidStr = typeof q.id === 'string' ? `'${q.id}'` : q.id;
-  return `<div class="border rounded-lg overflow-hidden ${isSection?'border-indigo-300':'border-slate-200'}" data-qid="${q.id}">
+  return `<div class="border rounded-lg overflow-hidden ${isSection?'border-brand-300':'border-slate-200'}" data-qid="${q.id}">
       <div class="drag-handle bg-slate-50 hover:bg-slate-100 cursor-move text-center text-slate-400 hover:text-slate-700 py-1 select-none text-xs border-b border-slate-200" title="按住拖曳調整順序">
         ⋮⋮⋮ 拖曳排序 ⋮⋮⋮
       </div>
-      <div class="p-4 ${isSection?'bg-indigo-50/40':''}">
+      <div class="p-4 ${isSection?'bg-brand-50/40':''}">
       <div class="grid md:grid-cols-12 gap-3 text-sm">
         <div class="md:col-span-3"><label class="text-xs text-slate-500">題型</label>
           <select data-f="type" class="w-full border rounded px-2 py-1.5" onchange="onTypeChange(this)">
@@ -357,9 +357,9 @@ function onTypeChange(sel) {
 
   // 章節背景色
   if (isSection) {
-    root.classList.add('bg-indigo-50/40', 'border-indigo-200');
+    root.classList.add('bg-brand-50/40', 'border-brand-200');
   } else {
-    root.classList.remove('bg-indigo-50/40', 'border-indigo-200');
+    root.classList.remove('bg-brand-50/40', 'border-brand-200');
   }
 }
 
@@ -535,7 +535,7 @@ function showToast(msg) {
   if (!toast) {
     toast = document.createElement('div');
     toast.id = 'saveToast';
-    toast.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:60;background:#16a34a;color:#fff;padding:8px 16px;border-radius:8px;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,.2);transition:opacity .3s';
+    toast.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:60;background:#234F46;color:#fff;padding:12px 20px;border-radius:12px;font-size:16px;box-shadow:0 4px 12px rgba(0,0,0,.2);transition:opacity .3s';
     document.body.appendChild(toast);
   }
   toast.textContent = msg;

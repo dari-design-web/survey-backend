@@ -5,26 +5,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>儀表板</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="../config.js?v=3.2.0"></script>
-<script src="../js/common.js?v=3.2.0"></script>
-<script src="../js/api.js?v=3.2.0"></script>
+<script src="../config.js?v=3.2.1"></script>
+<script src="../js/common.js?v=3.2.1"></script>
+<script src="../js/api.js?v=3.2.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   body{font-family:'Noto Sans TC',sans-serif}
   .dl-btn{
-    font-size:12px;color:#475569;background:#F1F5F9;border:1px solid #CBD5E1;
+    font-size:16px;min-height:44px;color:#234F46;background:#fff;border:1px solid #234F46;
     padding:4px 10px;border-radius:6px;cursor:pointer;white-space:nowrap;
     transition:all .15s;
   }
-  .dl-btn:hover{background:#E2E8F0;border-color:#94A3B8;color:#0F172A}
+  .dl-btn:hover{background:#EAF2EC}
   .dl-btn:active{transform:scale(.97)}
   .preset-btn{
-    font-size:12px;color:#475569;background:#F8FAFC;border:1px solid #CBD5E1;
+    font-size:16px;min-height:44px;color:#1D3029;background:#fff;border:1px solid #7E8C82;
     padding:3px 8px;border-radius:4px;cursor:pointer;white-space:nowrap;
     transition:all .15s;
   }
-  .preset-btn:hover{background:#E2E8F0;border-color:#94A3B8;color:#0F172A}
-  .preset-btn.active{background:#2563EB;color:#fff;border-color:#2563EB}
+  .preset-btn:hover{background:#EAF2EC}
+  .preset-btn.active{background:#234F46;color:#fff;border-color:#234F46}
 </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
@@ -145,15 +145,22 @@
   </div>
 </main>
 <script>
-const COLORS = ['#2563EB','#10B981','#F59E0B','#EF4444','#8B5CF6','#06B6D4','#EC4899','#14B8A6','#F97316'];
+const COLORS = ['#234F46','#805219','#254D6C','#9A352E','#7E8C82','#5E8F7F','#C28A3A','#4F7FA3','#53645B'];
+// 圖表字體與顏色（設計系統）：至少 16px、次要文字色、淡格線
+if (window.Chart) {
+  Chart.defaults.font.family = "'Noto Sans TC','Microsoft JhengHei',sans-serif";
+  Chart.defaults.font.size = 16;
+  Chart.defaults.color = '#53645B';
+  Chart.defaults.borderColor = '#D9DFD8';
+}
 
 function lineChart(id, labels, values, label){
   if (!values.length) { showEmpty(id, '尚無資料'); return; }
-  new Chart(document.getElementById(id),{type:'line',data:{labels,datasets:[{label,data:values,borderColor:'#2563EB',backgroundColor:'rgba(37,99,235,.1)',tension:.3,fill:true}]},options:{plugins:{legend:{display:false}}}});
+  new Chart(document.getElementById(id),{type:'line',data:{labels,datasets:[{label,data:values,borderColor:'#234F46',backgroundColor:'rgba(35,79,70,.10)',tension:.3,fill:true}]},options:{plugins:{legend:{display:false}}}});
 }
 function barChart(id, labels, values){
   if (!values.length) { showEmpty(id, '尚無資料'); return; }
-  new Chart(document.getElementById(id),{type:'bar',data:{labels,datasets:[{data:values,backgroundColor:'#2563EB'}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,max:5}}}});
+  new Chart(document.getElementById(id),{type:'bar',data:{labels,datasets:[{data:values,backgroundColor:'#234F46'}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,max:5}}}});
 }
 function pieChart(id, labels, values, boxId){
   if (!values.length) { showEmpty(id, '尚無資料', boxId); return; }
@@ -243,22 +250,22 @@ function pieWithTable(chartId, tableId, boxId, items) {
 }
 function colBar(id, labels, values, color){
   if (!values.length) { showEmpty(id, '尚無資料'); return; }
-  new Chart(document.getElementById(id),{type:'bar',data:{labels,datasets:[{data:values,backgroundColor:color||'#10B981'}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+  new Chart(document.getElementById(id),{type:'bar',data:{labels,datasets:[{data:values,backgroundColor:color||'#234F46'}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
 }
 
 // NPS 分群上色：0-6 紅色（批評者）、7-8 黃色（中立）、9-10 綠色（推薦）
 function npsColors() {
   return Array.from({length: 11}, (_, i) => {
-    if (i <= 6) return '#EF4444';
-    if (i <= 8) return '#F59E0B';
-    return '#10B981';
+    if (i <= 6) return '#9A352E';
+    if (i <= 8) return '#805219';
+    return '#234F46';
   });
 }
 
 // 通用：百分比長條圖（Y 軸固定 0~100%，bar 上顯示 %）
 function renderPctBar(id, labels, values, color) {
   if (!values.length) { showEmpty(id, '尚無資料'); return; }
-  const bgColor = Array.isArray(color) ? color : (color || '#8B5CF6');
+  const bgColor = Array.isArray(color) ? color : (color || '#234F46');
   const ctx = document.getElementById(id);
   if (!ctx) return;
   new Chart(ctx, {
@@ -468,7 +475,7 @@ function renderDashboard(data) {
     ['總問卷數', c.totalResponses, 'text-blue-700'],
     ['今日填寫', c.todayResponses, 'text-emerald-700'],
     ['本月填寫', c.monthResponses, 'text-sky-700'],
-    ['平均整體滿意度', c.overallAvg != null ? c.overallAvg + ' / 5' : '—', 'text-indigo-700'],
+    ['平均整體滿意度', c.overallAvg != null ? c.overallAvg + ' / 5' : '—', 'text-brand-700'],
     ['產生兌換券數', c.totalCoupons, 'text-slate-700'],
     ['已兌換', c.redeemedCoupons, 'text-green-700'],
     ['未兌換', c.issuedCoupons, 'text-amber-700'],
@@ -502,7 +509,7 @@ function renderDashboard(data) {
   renderPctBar('distChart',
     (data.overallDist || []).map(r => r.score + '分'),
     (data.overallDist || []).map(r => r.pct),
-    '#8B5CF6');
+    '#234F46');
 
   // NPS 0~10 分布 — 百分比
   renderPctBar('npsChart',
@@ -539,7 +546,7 @@ function renderDashboard(data) {
   } else {
     new Chart(document.getElementById('kwChart'), {
       type: 'bar',
-      data: { labels: mcLabels, datasets: [{ data: mcValues, backgroundColor: '#EC4899', borderRadius: 4 }] },
+      data: { labels: mcLabels, datasets: [{ data: mcValues, backgroundColor: '#805219', borderRadius: 4 }] },
       options: {
         plugins: {
           legend: { display: false },

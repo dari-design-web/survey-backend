@@ -18,3 +18,11 @@ body.has-sidebar .admin-top{position:sticky;top:0;z-index:30}
 td:last-child,th:last-child{text-align:inherit}
 canvas{height:auto}
 .pre{white-space:pre-line}
+/* 修正 G3：手機上單複選（含「其他」輸入框）造成的水平溢出 */
+.choices{grid-template-columns:minmax(0,1fr)}
+.choice{min-width:0}
+.choice>span{min-width:0;overflow-wrap:anywhere}
+.choice .other-input{width:0;flex:1 1 80px;min-width:0}
+.question legend{max-width:100%;overflow-wrap:anywhere}
+/* 首頁：手機上縮小插圖區，讓「開始填寫」更早出現 */
+@media(max-width:767px){.hero-art{min-height:96px;margin-bottom:16px}.archive-art{width:96px}}

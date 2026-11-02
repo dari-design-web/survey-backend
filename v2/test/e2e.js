@@ -149,7 +149,7 @@ function check(name, cond, extra) { results.push([name, !!cond]); console.log((c
     const m = body.match(/.{0,30}(失敗|Error|錯誤：).{0,30}/);
     check(`後台 ${p} 頁無錯誤`, !m, m && m[0].replace(/\s+/g, ' '));
   }
-  check('系統版本顯示', (await page.textContent('#sysInfo')).includes('3.1.1'));
+  check('系統版本顯示', (await page.textContent('#sysInfo')).includes('3.2.0'));
 
   check('頁面無 JavaScript 例外', errors.length === 0, errors.join(' | '));
   await browser.close();

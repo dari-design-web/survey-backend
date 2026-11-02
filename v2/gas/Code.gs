@@ -11,7 +11,7 @@
  * 版本：見 CODE_VERSION。原始碼來源：GitHub dari-design-web/survey-backend /v2/gas/
  */
 
-var CODE_VERSION = '3.1.1';
+var CODE_VERSION = '3.2.0';
 var GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/dari-design-web/survey-backend/main/v2/gas/';
 var TZ = 'Asia/Taipei';
 var JWT_TTL_HOURS = 8;
@@ -395,13 +395,18 @@ function audit(ctx, action, targetType, targetId, detail) {
 function giftStock(giftId, at) {
   giftId = Number(giftId);
   var now = at || new Date();
-  var onHand = 0;
-  Store.all('stock_logs').forEach(function (l) { if (l.gift_id === giftId) onHand += (l.on_hand_delta || 0); });
+  var onHand = 0, outByCoupon = {};
+  Store.all('stock_logs').forEach(function (l) {
+    if (l.gift_id !== giftId) return;
+    onHand += (l.on_hand_delta || 0);
+    if (l.coupon_id && (l.action === 'redeem' || l.action === 'reconcile')) outByCoupon[l.coupon_id] = (outByCoupon[l.coupon_id] || 0) + (l.on_hand_delta || 0);
+  });
   var reserved = 0;
   Store.all('coupons').forEach(function (c) {
     if (c.gift_id !== giftId || c.status !== 'issued') return;
     var exp = parseDate(c.expires_at);
     if (exp && exp <= now) return;
+    if ((outByCoupon[c.id] || 0) < 0) return;   // 已出庫、核銷尚未完成：不再重複預留
     reserved += 1;
   });
   return { on_hand: onHand, reserved: reserved, available: onHand - reserved };
@@ -530,16 +535,30 @@ function redeemCoupon(code, adminId) {
   if (c.status === 'expired') return { ok: false, status: 'expired', message: '此券已逾期。', coupon: c };
   if (c.status === 'voided') return { ok: false, status: 'voided', message: '此券已被作廢。', coupon: c };
   if (c.status !== 'issued') return { ok: false, status: 'invalid', message: '此券狀態異常。', coupon: c };
+  // 先寫出庫紀錄（每張券最多一筆），再改券狀態。中途失敗時只會「少算可發」，不會超發；
+  // 重試時不會重複出庫，未完成者由每日對帳處理。
+  if (c.gift_id && couponStockNet(c.id) === 0) addStockLog(c.gift_id, 'redeem', -1, c.id, adminId, '核銷 ' + c.coupon_code);
   var updated = Store.update('coupons', c.id, { status: 'redeemed', redeemed_at: nowIso(), redeemed_by: adminId });
-  if (c.gift_id) {
-    addStockLog(c.gift_id, 'redeem', -1, c.id, adminId, '核銷 ' + c.coupon_code);
-    refreshGiftSnapshot(c.gift_id);
-  }
+  if (c.gift_id) refreshGiftSnapshot(c.gift_id);
   Store.insert('redemption_logs', {
     coupon_id: c.id, user_id: c.user_id, action: 'redeem', status_before: 'issued', status_after: 'redeemed',
     admin_user_id: adminId, note: '工作人員核銷', created_at: nowIso()
   });
   return { ok: true, status: 'redeemed', message: '核銷成功！', coupon: updated };
+}
+
+/** 某張券在庫存紀錄中的淨出庫數（核銷 −1、對帳回補 +1） */
+function couponStockNet(couponId) {
+  var n = 0;
+  Store.all('stock_logs').forEach(function (l) {
+    if (l.coupon_id === couponId && (l.action === 'redeem' || l.action === 'reconcile')) n += (l.on_hand_delta || 0);
+  });
+  return n;
+}
+
+function intervalDays(s) {
+  var v = s.redemption_interval_days;
+  return v === null || v === undefined || v === '' || isNaN(Number(v)) ? 30 : Math.max(0, Number(v));
 }
 
 function voidCoupon(id, adminId, note) {
@@ -668,7 +687,7 @@ function apiPrecheck(ctx, m) {
   var u = userByDevice(ctx.query.deviceId);
   var out = { ok: true, generate_coupon: true };
   if (u) {
-    var r = checkEligibility(u.id, s.id, s.redemption_interval_days || 30);
+    var r = checkEligibility(u.id, s.id, intervalDays(s));
     if (!r.eligible) {
       out.eligible = false; out.reason = r.reason; out.message = r.message;
       if (r.next_eligible_date) out.nextDate = tpeDate(new Date(r.next_eligible_date));
@@ -685,14 +704,17 @@ function apiPrecheck(ctx, m) {
   return out;
 }
 
-function conditionMet(q, ansByQ, qmap) {
+function conditionMet(q, ansByQ, qmap, seen) {
+  seen = seen || {};
+  if (seen[q.id]) return false;          // 循環設定：視為不顯示，避免無限遞迴
+  seen[q.id] = true;
   var cond = q.display_condition;
   if (!cond || typeof cond !== 'object') return true;
   var dep = Number(cond.depends_on), accept = cond.show_when;
   if (!dep || !accept) return true;
   if (!qmap[dep]) return true;
   // 依賴題本身不顯示 → 此題也不顯示
-  if (!conditionMet(qmap[dep], ansByQ, qmap)) return false;
+  if (!conditionMet(qmap[dep], ansByQ, qmap, seen)) return false;
   var a = ansByQ[dep];
   if (!a) return false;
   var v = a.value;
@@ -772,8 +794,9 @@ function apiSubmitSurvey(ctx) {
   var clientId = str(b.clientSubmitId).slice(0, 64) || null;
 
   // 重送去重：同一 clientSubmitId 回傳第一次的結果
+  var dup = null;
   if (clientId) {
-    var dup = Store.findOne('survey_responses', function (r) { return r.client_submit_id === clientId; });
+    dup = Store.findOne('survey_responses', function (r) { return r.client_submit_id === clientId && r.survey_id === s.id; });
     if (dup && dup.result) { var res = dup.result; res.duplicate = true; return res; }
   }
 
@@ -786,17 +809,29 @@ function apiSubmitSurvey(ctx) {
   });
 
   var now = nowIso();
-  var resp = Store.insert('survey_responses', {
-    survey_id: s.id, user_id: u.id, client_submit_id: clientId, submitted_at: now, result: null
-  });
+  var resp;
+  if (dup) {
+    // 上次送出中途失敗：沿用同一筆填答，清掉不完整的答案後重寫
+    resp = dup;
+    Store.find('survey_answers', function (a) { return a.response_id === dup.id; })
+      .map(function (a) { return a.id; }).forEach(function (id) { Store.remove('survey_answers', id); });
+  } else {
+    resp = Store.insert('survey_responses', {
+      survey_id: s.id, user_id: u.id, client_submit_id: clientId, submitted_at: now, result: null
+    });
+  }
   Store.insertMany('survey_answers', rows.map(function (r) {
     r.response_id = resp.id; r.created_at = now; return r;
   }));
 
   var payload = { ok: true, message: '問卷送出成功，感謝您的回饋！', deviceId: deviceId, survey: publicSurvey(s) };
   if (s.generate_coupon) {
-    var el = checkEligibility(u.id, s.id, s.redemption_interval_days || 30);
-    if (el.eligible) {
+    var el = checkEligibility(u.id, s.id, intervalDays(s));
+    var already = Store.findOne('coupons', function (x) { return x.response_id === resp.id; });
+    if (already) {
+      payload.message = '問卷送出成功，兌換券已產生！';
+      payload.coupon = already;
+    } else if (el.eligible) {
       if (giftAvailableForSurvey(s).ok) {
         var c = issueCoupon(u.id, s, resp.id);
         payload.message = '問卷送出成功，兌換券已產生！';
@@ -957,10 +992,28 @@ function questionPayload(b) {
   };
 }
 
+/** 條件題設定檢查：依賴題須在同一問卷、不能依賴自己、不能形成循環 */
+function checkCondition(surveyId, qid, dc) {
+  if (!dc) return;
+  var dep = Number(dc.depends_on);
+  if (qid && dep === qid) fail(400, '顯示條件不能依賴題目本身');
+  var depQ = Store.get('survey_questions', dep);
+  if (!depQ || depQ.survey_id !== surveyId) fail(400, '顯示條件的依賴題目不存在或不屬於此問卷');
+  var seen = {}, cur = depQ;
+  while (cur && cur.display_condition && cur.display_condition.depends_on) {
+    if (seen[cur.id]) break;
+    seen[cur.id] = true;
+    var next = Number(cur.display_condition.depends_on);
+    if (qid && next === qid) fail(400, '顯示條件形成循環（A 依賴 B、B 又依賴 A），請修改');
+    cur = Store.get('survey_questions', next);
+  }
+}
+
 function apiCreateQuestion(ctx, m) {
   var sid = Number(m[1]);
   if (!Store.get('surveys', sid)) fail(404, 'not_found');
   var p = questionPayload(ctx.body || {});
+  checkCondition(sid, null, p.display_condition);
   p.survey_id = sid; p.created_at = nowIso();
   var q = Store.insert('survey_questions', p);
   audit(ctx, 'create_question', 'question', q.id);
@@ -969,8 +1022,11 @@ function apiCreateQuestion(ctx, m) {
 
 function apiUpdateQuestion(ctx, m) {
   var id = Number(m[1]);
-  if (!Store.get('survey_questions', id)) fail(404, 'not_found');
-  var q = Store.update('survey_questions', id, questionPayload(ctx.body || {}));
+  var old = Store.get('survey_questions', id);
+  if (!old) fail(404, 'not_found');
+  var p = questionPayload(ctx.body || {});
+  checkCondition(old.survey_id, id, p.display_condition);
+  var q = Store.update('survey_questions', id, p);
   audit(ctx, 'update_question', 'question', id);
   return { ok: true, question: q };
 }
@@ -1135,7 +1191,7 @@ function apiRedeemLookup(ctx) {
   var prev = Store.find('coupons', function (x) {
     return x.user_id === c.user_id && x.status === 'redeemed' && x.id !== c.id;
   }).sort(function (a, b) { return str(b.redeemed_at) < str(a.redeemed_at) ? -1 : 1; });
-  var interval = s.redemption_interval_days || 30;
+  var interval = intervalDays(s);
   var lastSame = Store.find('coupons', function (x) {
     return x.user_id === c.user_id && x.survey_id === c.survey_id && x.status === 'redeemed';
   }).sort(function (a, b) { return str(b.redeemed_at) < str(a.redeemed_at) ? -1 : 1; })[0];
@@ -1486,8 +1542,17 @@ function exportResponses(q) {
   }).sort(function (a, b) { return b.id - a.id; });
   var qs = Store.all('survey_questions').filter(function (x) { return (!sid || x.survey_id === sid) && x.question_type !== 'section'; })
     .sort(function (a, b) { return a.survey_id - b.survey_id || (a.sort_order || 0) - (b.sort_order || 0) || a.id - b.id; });
-  var ansMap = {};
-  Store.all('survey_answers').forEach(function (a) { (ansMap[a.response_id] = ansMap[a.response_id] || {})[a.question_id] = a; });
+  var ansMap = {}, rset = {}, extra = {};
+  resps.forEach(function (r) { rset[r.id] = true; });
+  var qset = {}; qs.forEach(function (x) { qset[x.id] = true; });
+  Store.all('survey_answers').forEach(function (a) {
+    (ansMap[a.response_id] = ansMap[a.response_id] || {})[a.question_id] = a;
+    // 已刪除的題目：用答案內保存的題目文字補一欄，避免舊答案在匯出中消失
+    if (rset[a.response_id] && !qset[a.question_id] && !extra[a.question_id]) {
+      extra[a.question_id] = { id: a.question_id, question_text: (a.question_text || ('題目 #' + a.question_id)) + '（已刪除題目）' };
+    }
+  });
+  qs = qs.concat(Object.keys(extra).map(function (k) { return extra[k]; }));
   var rows = [['填寫時間', '問卷名稱', '場域名稱', '匿名識別'].concat(qs.map(function (x) { return x.question_text; })).concat(['兌換券編號', '兌換券狀態', '贈品'])];
   resps.forEach(function (r) {
     var s = surveys[r.survey_id] || {}, c = cBy[r.id] || {}, u = users[r.user_id] || {};
@@ -1669,14 +1734,27 @@ function cronDaily() {
   } finally { lock.releaseLock(); }
 }
 
-/** 對帳：已核銷但沒有出庫紀錄的券 → 補一筆；逾期 → 標記；重算快照 */
+/**
+ * 對帳（每天自動執行；super 可手動執行）：
+ *  - 已核銷但沒有出庫紀錄 → 補一筆 −1
+ *  - 未核銷（逾期／作廢）卻有出庫紀錄（核銷中途失敗）→ 回補 +1
+ *  - 未過期、未核銷但已有出庫紀錄 → 視為核銷進行中，保留（可發數會暫時少 1，不會超發）
+ *  - 逾期券標記為 expired，並重算贈品快照
+ */
 function reconcile() {
-  var fixed = 0, expired = 0;
-  var logged = {};
-  Store.all('stock_logs').forEach(function (l) { if (l.action === 'redeem' || l.action === 'reconcile') logged[l.coupon_id] = true; });
+  var fixed = 0, expired = 0, now = new Date();
+  var net = {};
+  Store.all('stock_logs').forEach(function (l) {
+    if (l.coupon_id && (l.action === 'redeem' || l.action === 'reconcile')) net[l.coupon_id] = (net[l.coupon_id] || 0) + (l.on_hand_delta || 0);
+  });
   Store.all('coupons').slice().forEach(function (c) {
-    if (c.status === 'redeemed' && c.gift_id && !logged[c.id]) { addStockLog(c.gift_id, 'reconcile', -1, c.id, null, '補登核銷出庫 ' + c.coupon_code); fixed++; }
     if (markExpired(c)) expired++;
+    if (!c.gift_id) return;
+    var n = net[c.id] || 0;
+    if (c.status === 'redeemed' && n === 0) { addStockLog(c.gift_id, 'reconcile', -1, c.id, null, '補登核銷出庫 ' + c.coupon_code); fixed++; }
+    else if (c.status !== 'redeemed' && displayStatus(c, now) !== 'issued' && n < 0) {
+      addStockLog(c.gift_id, 'reconcile', -n, c.id, null, '核銷未完成，回補庫存 ' + c.coupon_code); fixed++;
+    }
   });
   Store.all('gifts').forEach(function (g) { refreshGiftSnapshot(g.id); });
   return { fixed: fixed, expired: expired };
@@ -1857,7 +1935,12 @@ function dispatch(req) {
       lock = LockService.getScriptLock();
       if (!lock.tryLock(25000)) return { status: 503, body: { ok: false, message: '目前使用人數較多，請稍後再試一次' } };
       Store.reset();   // 取得鎖之後重新讀取，避免用到別人寫入前的舊資料
-      if (ctx.user) ctx.user = verifyToken(req.token || query.token) || ctx.user;
+      if (route[3]) {
+        // 鎖內重新驗證：等待期間被停用、刪除或降權者一律拒絕
+        ctx.user = verifyToken(req.token || query.token);
+        if (!ctx.user) return { status: 401, body: { error: 'Unauthorized' } };
+        if (route[3].indexOf(ctx.user.role) < 0) return { status: 403, body: { error: 'Forbidden' } };
+      }
     }
     var body = route[2](ctx, m);
     if (lock) SpreadsheetApp.flush();

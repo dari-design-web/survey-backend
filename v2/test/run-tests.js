@@ -293,6 +293,117 @@ test('兌換期限 24 小時：逾時未兌換自動取消並回補庫存', () =
   assert.strictEqual((new Date(cp2.expires_at) - new Date(cp2.issued_at)) / 3600000, 2);
 });
 
+console.log('\nGPT 審查（R1–R6）回歸測試');
+test('R1 核銷中途失敗：不超發、可發不為負，重試只出庫一次', () => {
+  const c = boot();
+  api(c.env, 'POST', '/api/admin/gifts/' + c.ids.gift_id + '/stock', { action: 'count', qty: 1, note: '盤點' }, c.T);
+  const cp = submit(c, 'dev1').body.coupon;
+  const orig = c.env.Store.update;
+  let failOnce = true;
+  c.env.Store.update = function (name, id, patch) {
+    if (name === 'coupons' && patch.status === 'redeemed' && failOnce) { failOnce = false; throw new Error('模擬寫入失敗'); }
+    return orig.apply(this, arguments);
+  };
+  const r1 = api(c.env, 'POST', '/api/redeem', { code: cp.coupon_code }, c.T);
+  assert.strictEqual(r1.status, 500);
+  c.env.Store.reset();
+  let st = c.env.giftStock(c.ids.gift_id);
+  assert.ok(st.available >= 0 && st.available === 0, JSON.stringify(st));
+  assert.strictEqual(submit(c, 'dev2').body.reason, 'out_of_stock');      // 不會超發
+  const r2 = api(c.env, 'POST', '/api/redeem', { code: cp.coupon_code }, c.T);
+  assert.strictEqual(r2.body.ok, true);
+  c.env.Store.update = orig;
+  c.env.reconcile(); c.env.reconcile();
+  st = c.env.giftStock(c.ids.gift_id);
+  assert.strictEqual(JSON.stringify([st.on_hand, st.reserved, st.available]), JSON.stringify([0, 0, 0]));
+});
+
+test('R1 核銷失敗後券逾期：對帳回補一次', () => {
+  const c = boot();
+  const cp = submit(c, 'dev1').body.coupon;
+  const orig = c.env.Store.update;
+  c.env.Store.update = function (name, id, patch) {
+    if (name === 'coupons' && patch.status === 'redeemed') throw new Error('x');
+    return orig.apply(this, arguments);
+  };
+  api(c.env, 'POST', '/api/redeem', { code: cp.coupon_code }, c.T);
+  c.env.Store.update = orig;
+  c.env.Store.reset();
+  c.env.Store.update('coupons', cp.id, { expires_at: new Date(Date.now() - 1000).toISOString() });
+  const r = c.env.reconcile(); c.env.reconcile();
+  const st = c.env.giftStock(c.ids.gift_id);
+  assert.strictEqual(r.fixed, 1);
+  assert.strictEqual(JSON.stringify([st.on_hand, st.reserved, st.available]), JSON.stringify([20, 0, 20]));
+});
+
+test('R2 等鎖期間帳號被停用 → 寫入被拒', () => {
+  const c = boot();
+  const orig = c.env.LockService.getScriptLock;
+  c.env.LockService.getScriptLock = () => ({
+    tryLock() { c.env.Store.reset(); c.env.Store.update('admin_users', 1, { is_active: 0 }); return true; },
+    releaseLock() {}
+  });
+  const r = api(c.env, 'POST', '/api/admin/gifts', { name: '不該建立', initial_qty: 1 }, c.T);
+  c.env.LockService.getScriptLock = orig;
+  assert.strictEqual(r.status, 401);
+  c.env.Store.reset();
+  assert.ok(!c.env.Store.all('gifts').some(g => g.name === '不該建立'));
+});
+
+test('R3 兌換間隔 0 天：核銷後可立即再領', () => {
+  const c = boot();
+  const sv = api(c.env, 'GET', '/api/admin/surveys/' + c.ids.survey_id, null, c.T).body.survey;
+  api(c.env, 'PUT', '/api/admin/surveys/' + sv.id, Object.assign({}, sv, { redemption_interval_days: 0 }), c.T);
+  const cp = submit(c, 'devA').body.coupon;
+  api(c.env, 'POST', '/api/redeem', { code: cp.coupon_code }, c.T);
+  assert.strictEqual(api(c.env, 'GET', '/api/public/precheck/' + sv.id + '?deviceId=devA').body.eligible, true);
+  assert.ok(submit(c, 'devA').body.coupon);
+});
+
+test('R4 條件題循環：儲存時拒絕；資料已循環時送出不當機', () => {
+  const c = boot();
+  const sid = c.ids.survey_id;
+  const qa = c.questions.find(q => q.question_type === 'nps'), qb = c.questions.find(q => q.question_type === 'multiple');
+  const r1 = api(c.env, 'PUT', '/api/admin/questions/' + qa.id, Object.assign({}, qa, { display_condition: { depends_on: qa.id, show_when: ['1'] } }), c.T);
+  assert.strictEqual(r1.status, 400);
+  api(c.env, 'PUT', '/api/admin/questions/' + qa.id, Object.assign({}, qa, { display_condition: { depends_on: qb.id, show_when: ['x'] } }), c.T);
+  const r2 = api(c.env, 'PUT', '/api/admin/questions/' + qb.id, Object.assign({}, qb, { display_condition: { depends_on: qa.id, show_when: ['1'] } }), c.T);
+  assert.strictEqual(r2.status, 400);
+  c.env.Store.reset();
+  c.env.Store.update('survey_questions', qb.id, { display_condition: { depends_on: qa.id, show_when: ['1'] } });
+  const ans = fullAnswers(c.questions).filter(a => a.questionId !== qa.id && a.questionId !== qb.id);
+  assert.strictEqual(submit(c, 'dev9', { answers: ans }).status, 200);
+});
+
+test('R5 送出中途失敗後重試：只留下一筆填答與一張券', () => {
+  const c = boot();
+  const orig = c.env.Store.insertMany;
+  let failOnce = true;
+  c.env.Store.insertMany = function (name) {
+    if (name === 'survey_answers' && failOnce) { failOnce = false; throw new Error('模擬寫入失敗'); }
+    return orig.apply(this, arguments);
+  };
+  const a = submit(c, 'devR', { clientSubmitId: 'retry-1' });
+  const b = submit(c, 'devR', { clientSubmitId: 'retry-1' });
+  c.env.Store.insertMany = orig;
+  assert.strictEqual(a.status, 500);
+  assert.strictEqual(b.status, 200, JSON.stringify(b.body));
+  c.env.Store.reset();
+  assert.strictEqual(c.env.Store.all('survey_responses').length, 1);
+  assert.strictEqual(c.env.Store.all('coupons').length, 1);
+  assert.strictEqual(c.env.Store.all('survey_answers').length, 20);
+});
+
+test('R6 刪除題目後匯出仍保留舊答案（標示已刪除）', () => {
+  const c = boot();
+  const ta = c.questions.find(q => q.question_type === 'textarea');
+  submit(c, 'devA', { answers: fullAnswers(c.questions, { [ta.id]: '舊答案保留' }) });
+  api(c.env, 'DELETE', '/api/admin/questions/' + ta.id, null, c.T);
+  const csv = api(c.env, 'GET', '/api/admin/export/responses', null, c.T).body.__csv;
+  assert.ok(csv.includes('舊答案保留'));
+  assert.ok(csv.includes('（已刪除題目）'));
+});
+
 console.log('\n後台與匯出');
 test('儀表板、意見、兌換券列表、我的兌換券', () => {
   const c = boot();

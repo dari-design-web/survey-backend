@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>隱私權聲明｜滿意度調查系統</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="config.js?v=3.2.0"></script>
-<script src="js/common.js?v=3.2.0"></script>
-<script src="js/api.js?v=3.2.0"></script>
+<script src="config.js?v=3.2.1"></script>
+<script src="js/common.js?v=3.2.1"></script>
+<script src="js/api.js?v=3.2.1"></script>
 </head>
 <body class="bg-slate-50 text-slate-800">
 <main class="max-w-2xl mx-auto px-5 py-8">
@@ -33,7 +33,7 @@
 
   <section class="bg-white border border-slate-200 rounded-xl p-6 mb-4">
     <h2 class="text-lg font-bold text-brand-700 mb-2">二、蒐集項目</h2>
-    <p class="text-sm leading-relaxed mb-2">本系統採用<strong>完全匿名</strong>方式蒐集，不收集您的姓名、電話、地址、Email 或身分證等個人識別資料。實際蒐集內容如下：</p>
+    <p class="text-sm leading-relaxed mb-2">本系統<strong>不要求</strong>您提供姓名、電話、地址、Email 或身分證等個人識別資料，以裝置識別碼代替身分。實際蒐集內容如下：（若問卷含電話題，或您在意見欄自行填寫個人資料，該內容會一併保存。）</p>
     <ul class="list-disc list-inside text-sm leading-relaxed space-y-1">
       <li><strong>問卷填答內容</strong>（您主動填寫的選項與意見）</li>
       <li><strong>填寫時間</strong></li>
@@ -48,7 +48,7 @@
     <h2 class="text-lg font-bold text-brand-700 mb-2">三、利用方式</h2>
     <ul class="list-disc list-inside text-sm leading-relaxed space-y-1">
       <li>填答資料以「整體統計」方式呈現，<strong>不對外公開個別填答內容</strong></li>
-      <li>不會將您的資料提供給第三方</li>
+      <li>不會將您的資料出售或提供他人作行銷使用</li><li>系統使用的外部服務：資料存放於 Google（試算表與 Apps Script）；網頁由 GitHub Pages 提供，該服務可能依其政策記錄連線 IP；兌換券 QR Code 圖片由 api.qrserver.com 產生，該服務會收到兌換券編號</li>
       <li>不會用於行銷、廣告或其他商業用途</li>
     </ul>
   </section>
@@ -56,10 +56,9 @@
   <section class="bg-white border border-slate-200 rounded-xl p-6 mb-4">
     <h2 class="text-lg font-bold text-brand-700 mb-2">四、保存期限</h2>
     <ul class="list-disc list-inside text-sm leading-relaxed space-y-1">
-      <li><strong>已兌換的兌換券</strong>：核銷後 30 天自動從系統刪除</li>
-      <li><strong>已逾期或已作廢的兌換券</strong>：逾期 30 天後自動刪除</li>
-      <li><strong>問卷填答內容</strong>：以匿名方式長期保存，作為統計研究使用</li>
-      <li><strong>您的裝置識別碼</strong>：30 天無新活動可自行清除瀏覽器資料</li>
+      <li><strong>兌換券</strong>：已兌換、逾期或作廢超過 30 天者，不再顯示於「我的兌換券」頁面；紀錄仍保留於後台，供統計與贈品庫存對帳使用</li>
+            <li><strong>問卷填答內容與兌換紀錄</strong>：保存期間依主辦單位規定辦理（公告前以服務改善與統計所需期間為限）</li>
+      <li><strong>您的裝置識別碼</strong>：存於您的瀏覽器，您可隨時自行清除</li>
     </ul>
   </section>
 
@@ -74,9 +73,9 @@
       <li><strong>請求刪除</strong> — 請依下方「八、聯絡方式」聯絡管理者，由管理者協助辦理</li>
     </ul>
     <p class="text-xs leading-relaxed mt-3 text-slate-500">
-      ⓘ 本系統採完全匿名方式蒐集，<strong>不收集姓名、電話、地址、Email 等個人識別資料</strong>。
+      ⓘ 本系統<strong>不要求填寫姓名、電話、地址、Email 等個人識別資料</strong>。
       您可隨時於「<a href="my-coupons.html" class="text-brand-600 underline">我的兌換券</a>」頁面查看自己曾領取的兌換券。
-      已兌換或過期的兌換券紀錄會於 30 天後自動清除。
+      已兌換或過期超過 30 天的兌換券不再顯示於該頁，但紀錄仍保留於後台。
     </p>
   </section>
 
@@ -96,9 +95,9 @@
     <h2 class="text-lg font-bold text-brand-700 mb-2">七、資料安全</h2>
     <ul class="list-disc list-inside text-sm leading-relaxed space-y-1">
       <li>所有資料傳輸採 HTTPS / TLS 加密</li>
-      <li>後台管理者帳號採 bcrypt 加密儲存密碼</li>
-      <li>資料庫採加密連線</li>
-      <li>不記錄您的 IP 位址或詳細瀏覽器資訊</li>
+      <li>後台管理者密碼以加鹽雜湊方式儲存，不保存明碼</li>
+      <li>資料存放於主辦單位的 Google 試算表，僅授權管理者可存取</li>
+      <li>本系統的資料表不記錄您的 IP 位址或詳細瀏覽器資訊（外部服務的紀錄請見「三、利用方式」）</li>
     </ul>
   </section>
 
