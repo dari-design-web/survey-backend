@@ -11,7 +11,7 @@
  * 版本：見 CODE_VERSION。原始碼來源：GitHub dari-design-web/survey-backend /v2/gas/
  */
 
-var CODE_VERSION = '3.2.0';
+var CODE_VERSION = '3.2.1';
 var GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/dari-design-web/survey-backend/main/v2/gas/';
 var TZ = 'Asia/Taipei';
 var JWT_TTL_HOURS = 8;
@@ -794,17 +794,22 @@ function apiSubmitSurvey(ctx) {
   var clientId = str(b.clientSubmitId).slice(0, 64) || null;
 
   // 重送去重：同一 clientSubmitId 回傳第一次的結果
+  var deviceId = str(b.deviceId).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
+  if (!deviceId) deviceId = Utilities.getUuid().replace(/-/g, '');
+  var existingUser = userByDevice(deviceId);
+
+  // 去重只在「同一問卷＋同一裝置＋同一送出編號」時成立；其他裝置重用編號視為另一筆
   var dup = null;
-  if (clientId) {
-    dup = Store.findOne('survey_responses', function (r) { return r.client_submit_id === clientId && r.survey_id === s.id; });
+  if (clientId && existingUser) {
+    dup = Store.findOne('survey_responses', function (r) {
+      return r.client_submit_id === clientId + '@' + existingUser.id && r.survey_id === s.id && r.user_id === existingUser.id;
+    });
     if (dup && dup.result) { var res = dup.result; res.duplicate = true; return res; }
   }
 
   var rows = validateAnswers(s, b.answers);
 
-  var deviceId = str(b.deviceId).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
-  if (!deviceId) deviceId = Utilities.getUuid().replace(/-/g, '');
-  var u = userByDevice(deviceId) || Store.insert('users', {
+  var u = existingUser || Store.insert('users', {
     external_id: 'device:' + deviceId, name: '匿名民眾', phone: null, email: null, created_at: nowIso()
   });
 
@@ -817,7 +822,7 @@ function apiSubmitSurvey(ctx) {
       .map(function (a) { return a.id; }).forEach(function (id) { Store.remove('survey_answers', id); });
   } else {
     resp = Store.insert('survey_responses', {
-      survey_id: s.id, user_id: u.id, client_submit_id: clientId, submitted_at: now, result: null
+      survey_id: s.id, user_id: u.id, client_submit_id: clientId ? clientId + '@' + u.id : null, submitted_at: now, result: null
     });
   }
   Store.insertMany('survey_answers', rows.map(function (r) {
@@ -1553,7 +1558,17 @@ function exportResponses(q) {
     }
   });
   qs = qs.concat(Object.keys(extra).map(function (k) { return extra[k]; }));
-  var rows = [['填寫時間', '問卷名稱', '場域名稱', '匿名識別'].concat(qs.map(function (x) { return x.question_text; })).concat(['兌換券編號', '兌換券狀態', '贈品'])];
+  // 題目改過文字：欄名附上填答當時曾用的題名，避免以新題意解讀舊答案
+  var oldTitles = {};
+  Store.all('survey_answers').forEach(function (a) {
+    if (!rset[a.response_id] || !qset[a.question_id] || !a.question_text) return;
+    (oldTitles[a.question_id] = oldTitles[a.question_id] || {})[a.question_text] = true;
+  });
+  function header(x) {
+    var olds = Object.keys(oldTitles[x.id] || {}).filter(function (t) { return t !== x.question_text; });
+    return olds.length ? x.question_text + '［曾用題名：' + olds.join('；') + '］' : x.question_text;
+  }
+  var rows = [['填寫時間', '問卷名稱', '場域名稱', '匿名識別'].concat(qs.map(header)).concat(['兌換券編號', '兌換券狀態', '贈品'])];
   resps.forEach(function (r) {
     var s = surveys[r.survey_id] || {}, c = cBy[r.id] || {}, u = users[r.user_id] || {};
     var row = [fmtTpe(r.submitted_at), s.title, s.location_name, 'U' + r.user_id];

@@ -404,6 +404,28 @@ test('R6 刪除題目後匯出仍保留舊答案（標示已刪除）', () => {
   assert.ok(csv.includes('（已刪除題目）'));
 });
 
+test('R5b 其他裝置重用送出編號：不會拿到別人的券', () => {
+  const c = boot();
+  const a = submit(c, 'devA', { clientSubmitId: 'shared-id' });
+  const b = submit(c, 'devB', { clientSubmitId: 'shared-id' });
+  assert.strictEqual(b.status, 200);
+  assert.ok(!b.body.duplicate);
+  assert.notStrictEqual(b.body.coupon.coupon_code, a.body.coupon.coupon_code);
+  assert.strictEqual(b.body.deviceId, 'devB');
+  const a2 = submit(c, 'devA', { clientSubmitId: 'shared-id' });
+  assert.strictEqual(a2.body.duplicate, true);
+  assert.strictEqual(a2.body.coupon.coupon_code, a.body.coupon.coupon_code);
+});
+
+test('R6b 改題名後匯出：欄名附上曾用題名', () => {
+  const c = boot();
+  const q = c.questions.find(x => x.question_type === 'textarea');
+  submit(c, 'devA', { answers: fullAnswers(c.questions, { [q.id]: '舊題目的回答' }) });
+  api(c.env, 'PUT', '/api/admin/questions/' + q.id, Object.assign({}, q, { question_text: '全新的題目文字' }), c.T);
+  const csv = api(c.env, 'GET', '/api/admin/export/responses', null, c.T).body.__csv;
+  assert.ok(csv.includes('全新的題目文字［曾用題名：' + q.question_text + '］'), csv.split('\n')[0].slice(0, 300));
+});
+
 console.log('\n後台與匯出');
 test('儀表板、意見、兌換券列表、我的兌換券', () => {
   const c = boot();
