@@ -9,6 +9,21 @@
 <script src="../config.js?v=3.3.1"></script>
 <script src="../js/common.js?v=3.3.1"></script>
 <script src="../js/api.js?v=3.3.1"></script>
+<style>
+  /* 題目卡：自動編號（拖曳後也會更新）、章節淡綠底 */
+  #qList { counter-reset: qn; }
+  #qList .q-card { box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+  #qList .q-card:not(.is-section) { counter-increment: qn; }
+  #qList .q-card:not(.is-section) .q-num::before { content: "第 " counter(qn) " 題"; }
+  #qList .q-card.is-section { background: #EEF5F0; }
+  #qList .q-card.is-section .drag-handle { background: #E1EEE5; }
+  #qList .q-card.is-section .q-num::before { content: "章節"; color: #234F46; }
+  #qList .drag-handle { min-height: 44px; }
+  #qsec button, #fab button, #sec_done button { min-height: 44px; }
+  #saveAllBtnTop, #saveAllBtnBottom, #saveBtn { min-height: 52px; font-size: 16px; padding-left: 20px; padding-right: 20px; }
+  #qList [data-f] { min-height: 40px; font-size: 16px; }
+  #qList label.text-xs, #qList .text-xs { font-size: 14px; }
+</style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
 <script>renderAdminHeader('surveys');</script>
@@ -259,9 +274,10 @@ function questionHTML(q) {
   const optLabel = isSection ? '章節說明文字（顯示在標題下方）' : '選項（每行一個；含「其他」者前台自動加文字欄）';
   const showOpts = HAS_OPTIONS.has(q.question_type);
   const qidStr = typeof q.id === 'string' ? `'${q.id}'` : q.id;
-  return `<div class="border rounded-lg overflow-hidden ${isSection?'border-brand-300':'border-slate-200'}" data-qid="${q.id}">
-      <div class="drag-handle bg-slate-50 hover:bg-slate-100 cursor-move text-center text-slate-400 hover:text-slate-700 py-1 select-none text-xs border-b border-slate-200" title="按住拖曳調整順序">
-        ⋮⋮⋮ 拖曳排序 ⋮⋮⋮
+  return `<div class="q-card border rounded-xl overflow-hidden ${isSection?'is-section border-brand-300':'border-slate-200'}" data-qid="${q.id}">
+      <div class="drag-handle bg-slate-50 hover:bg-slate-100 cursor-move text-slate-500 hover:text-slate-700 px-4 select-none border-b border-slate-200 flex items-center gap-3" title="按住拖曳調整順序">
+        <span class="q-num font-bold text-slate-700"></span>
+        <span class="ml-auto text-sm">⋮⋮ 拖曳排序</span>
       </div>
       <div class="p-4 ${isSection?'bg-brand-50/40':''}">
       <div class="grid md:grid-cols-12 gap-3 text-sm">
@@ -353,6 +369,7 @@ function onTypeChange(sel) {
   const type = sel.value;
   root.dataset.type = type;
   const isSection = type === 'section';
+  root.classList.toggle('is-section', isSection);
   const showOpts = HAS_OPTIONS.has(type);
 
   // 選項欄顯示/隱藏
@@ -582,7 +599,7 @@ function setBusyDelayed(label, delay = 500) {
     if (!el) {
       el = document.createElement('div');
       el.id = 'busyBar';
-      el.className = 'fixed top-2 right-2 z-50 bg-amber-50 border border-amber-300 text-amber-800 px-3 py-1.5 rounded text-xs shadow-md';
+      el.className = 'fixed top-2 right-2 z-50 bg-amber-50 border border-amber-300 text-amber-800 px-4 py-2 rounded text-base shadow-md';
       document.body.appendChild(el);
     }
     el.textContent = label;
