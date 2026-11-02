@@ -65,14 +65,14 @@
         <h3 class="text-sm font-bold">每日填寫趨勢（近 30 天）</h3>
         <button onclick="dl('daily-trend')" class="dl-btn">📥 下載</button>
       </div>
-      <canvas id="dailyChart" height="120"></canvas>
+      <div id="dailyChartBox" class="relative"><canvas id="dailyChart" height="120"></canvas></div>
     </div>
     <div class="bg-white rounded-xl border p-4">
       <div class="flex items-center justify-between mb-3">
         <h3 class="text-sm font-bold">各項滿意度平均</h3>
         <button onclick="dl('satisfaction-avg')" class="dl-btn">📥 下載</button>
       </div>
-      <canvas id="satChart" height="180"></canvas>
+      <div id="satChartBox" class="relative"><canvas id="satChart" height="180"></canvas></div>
     </div>
     <div class="bg-white rounded-xl border p-4">
       <div class="flex items-center justify-between mb-3">
@@ -90,7 +90,7 @@
         <button onclick="dl('monthly-comments')" class="dl-btn">📥 下載</button>
       </div>
       <p class="text-[11px] text-slate-500 mb-2">統計「最滿意 / 最需改善」等開放式題目的填答數量</p>
-      <canvas id="kwChart" height="160"></canvas>
+      <div id="kwChartBox" class="relative"><canvas id="kwChart" height="160"></canvas></div>
     </div>
   </div>
   <details id="moreStats" class="mt-5 bg-white rounded-xl border">
@@ -101,7 +101,7 @@
           <h3 class="text-sm font-bold">每月填寫趨勢（近 12 個月）</h3>
           <button onclick="dl('monthly-trend')" class="dl-btn">📥 下載</button>
         </div>
-        <canvas id="monthlyChart" height="120"></canvas>
+        <div id="monthlyChartBox" class="relative"><canvas id="monthlyChart" height="120"></canvas></div>
       </div>
       <div class="bg-white rounded-xl border p-4">
         <div class="flex items-center justify-between mb-1">
@@ -109,7 +109,7 @@
           <button onclick="dl('score-distribution')" class="dl-btn">📥 下載</button>
         </div>
         <p class="text-[11px] text-slate-500 mb-2">彙總所有滿意度評分題（Q6~Q14）的填答分布</p>
-        <canvas id="distChart" height="160"></canvas>
+        <div id="distChartBox" class="relative"><canvas id="distChart" height="160"></canvas></div>
       </div>
       <div class="bg-white rounded-xl border p-4 md:col-span-2">
         <div class="flex flex-wrap items-center gap-4 mb-3">
@@ -117,7 +117,7 @@
           <div id="npsSummary" class="text-xs text-slate-600 flex flex-wrap gap-3 flex-1"></div>
           <button onclick="dl('nps-distribution')" class="dl-btn">📥 下載</button>
         </div>
-        <canvas id="npsChart" height="80"></canvas>
+        <div id="npsChartBox" class="relative"><canvas id="npsChart" height="80"></canvas></div>
       </div>
     </div>
   </details>
@@ -294,9 +294,9 @@ function renderPctBar(id, labels, values, color) {
   });
 }
 function showEmpty(canvasId, msg, boxId){
+  // 只替換圖表區（穩定容器），標題與下載鈕保留；之後 resetChartSlots 會在同一容器重建 canvas
   const canvas = document.getElementById(canvasId);
-  if (!canvas) return;
-  const parent = boxId ? document.getElementById(boxId) : canvas.parentElement;
+  const parent = document.getElementById(boxId || (canvasId + 'Box')) || (canvas && canvas.parentElement);
   if (parent) {
     parent.innerHTML = `<div class="flex items-center justify-center h-40 text-slate-400 text-sm">${msg}</div>`;
   }
@@ -348,13 +348,13 @@ async function loadDashboard() {
 
 // 圖表容器 → canvas 重建設定
 const CHART_SLOTS = [
-  { canvas: 'dailyChart',   height: 120 },
-  { canvas: 'monthlyChart', height: 120 },
-  { canvas: 'satChart',     height: 180 },
-  { canvas: 'distChart',    height: 160 },
-  { canvas: 'npsChart',     height: 80  },
+  { canvas: 'dailyChart', boxId: 'dailyChartBox',   height: 120 },
+  { canvas: 'monthlyChart', boxId: 'monthlyChartBox', height: 120 },
+  { canvas: 'satChart', boxId: 'satChartBox',     height: 180 },
+  { canvas: 'distChart', boxId: 'distChartBox',    height: 160 },
+  { canvas: 'npsChart', boxId: 'npsChartBox',     height: 80  },
   { canvas: 'couponChart',  boxId: 'couponBox',  tableId: 'couponTable'  },
-  { canvas: 'kwChart',      height: 160 },
+  { canvas: 'kwChart', boxId: 'kwChartBox',      height: 160 },
 ];
 
 // 記住已渲染過的分項統計 chart instance（為了 destroy 重建）
@@ -483,7 +483,7 @@ function renderDashboard(data) {
 
   const c = data.cards;
   const primary = [
-    ['總問卷數', c.totalResponses],
+    ['累積填答數', c.totalResponses],
     ['本月填寫', c.monthResponses],
     ['未兌換（有效券）', c.issuedCoupons],
     ['已兌換', c.redeemedCoupons],
