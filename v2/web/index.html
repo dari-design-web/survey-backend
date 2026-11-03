@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>服務滿意度調查</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="config.js?v=3.4.5"></script>
-<script src="js/common.js?v=3.4.5"></script>
-<script src="js/api.js?v=3.4.5"></script>
+<script src="config.js?v=3.4.6"></script>
+<script src="js/common.js?v=3.4.6"></script>
+<script src="js/api.js?v=3.4.6"></script>
 </head>
 <body>
 <a class="skip" href="#main">跳至主要內容</a>
@@ -33,7 +33,17 @@
 (async () => {
   const list = document.getElementById('list');
   try {
-    const { surveys } = await API.get('/api/public/surveys');
+    // 先用上次的列表立即顯示，背景更新；並預先下載各問卷內容，點進去時可立即顯示
+    const cached = cacheRead('surveys');
+    const freshP = fetchAndCache('surveys', '/api/public/surveys');
+    if (cached) { render(cached.surveys); freshP.then(d => { if (JSON.stringify(d) !== JSON.stringify(cached)) render(d.surveys); prefetch(d.surveys); }).catch(() => {}); return; }
+    const { surveys } = await freshP;
+    render(surveys); prefetch(surveys);
+  } catch (e) {
+    list.innerHTML = notice('error', 'alert', '暫時無法連線，請稍後再試一次。<br><span class="muted">' + escHtml(e.message) + '</span>', 'alert');
+  }
+  function prefetch(surveys) { surveys.forEach(s => fetchAndCache('survey_' + s.id, '/api/public/surveys/' + s.id).catch(() => {})); }
+  function render(surveys) {
     document.getElementById('count').textContent = String(surveys.length).padStart(2, '0');
     if (!surveys.length) {
       list.innerHTML = notice('', 'info', '目前沒有進行中的問卷，歡迎稍後再回來。');
@@ -50,8 +60,6 @@
         <a class="btn btn-primary primary-action full" href="survey.html?id=${s.id}">開始填寫 ${icon('arrow')}</a>
       </article>`).join('');
     loadGiftImages(list);
-  } catch (e) {
-    list.innerHTML = notice('error', 'alert', '暫時無法連線，請稍後再試一次。<br><span class="muted">' + escHtml(e.message) + '</span>', 'alert');
   }
 })();
 </script>

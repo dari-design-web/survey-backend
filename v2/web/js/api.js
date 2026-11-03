@@ -65,7 +65,7 @@ window.API = (function () {
         return new Promise(() => {});
       }
     }
-    if (status >= 400) throw new Error(data.message || data.error || ('HTTP ' + status));
+    if (status >= 400) { const err = new Error(data.message || data.error || ('HTTP ' + status)); err.status = status; throw err; }
     return data;
   }
 

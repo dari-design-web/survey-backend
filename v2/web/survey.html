@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>填寫問卷</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="config.js?v=3.4.5"></script>
-<script src="js/common.js?v=3.4.5"></script>
-<script src="js/api.js?v=3.4.5"></script>
+<script src="config.js?v=3.4.6"></script>
+<script src="js/common.js?v=3.4.6"></script>
+<script src="js/api.js?v=3.4.6"></script>
 <style>.qtext{white-space:pre-line}.other-input{flex:1;min-width:0;border:0;border-bottom:1px solid var(--edge);padding:4px 8px;background:transparent}.submit-bar{position:sticky;bottom:0;background:var(--paper);padding:16px 0;border-top:1px solid var(--line);margin-top:28px;z-index:10}</style>
 </head>
 <body>
@@ -168,28 +168,75 @@ function evaluateAllConditions() {
     return;
   }
   try {
-    // 同時打兩個 API：問卷內容 + 預檢兌換資格
+    // 加速：問卷內容先用本機快取立即顯示（背景更新）；需授權且尚未授權時直接顯示授權卡，不等後端
     const did = getDeviceId();
-    const [{ survey, questions: qs }, precheck] = await Promise.all([
-      API.get('/api/public/surveys/' + surveyId),
-      API.get('/api/public/precheck/' + surveyId + '?deviceId=' + encodeURIComponent(did)).catch(() => ({ ok: false }))
-    ]);
-    questions = qs;
-
-    // 如果預檢顯示不能領券，先給警告（民眾仍可填，但會看到提示）
-    let precheckBanner = '';
-    if (precheck?.ok && precheck.eligible === false) {
-      if (precheck.reason === 'monthly_limit' || precheck.reason === 'interval_not_met') {
-        precheckBanner = notice('warning', 'clock', `<strong>每個帳號每月限領一次贈品，您本月已兌換過</strong><br>仍歡迎填寫分享意見，本次不會產生兌換券。${precheck.nextDate ? `<br>${esc(precheck.nextDate)} 起可再領取。` : ''}`);
-      } else if (precheck.reason === 'out_of_stock') {
-        precheckBanner = notice('warning', 'gift', '<strong>本期贈品已兌換完畢</strong><br>仍可填答，本次不發兌換券。');
-      } else if (precheck.reason === 'existing_coupon' && precheck.existingCouponCode) {
-        precheckBanner = notice('', 'ticket', `<strong>您已有一張未使用的兌換券</strong><br><span class="mono">${esc(precheck.existingCouponCode)}</span><br>
-          <a class="link" href="coupon.html?code=${encodeURIComponent(precheck.existingCouponCode)}">查看兌換券 ${icon('arrow', 18)}</a>
-          <br>填寫此問卷不會再產生新券。`);
-      }
+    const cachedData = cacheRead('survey_' + surveyId);
+    const freshP = fetchAndCache('survey_' + surveyId, '/api/public/surveys/' + surveyId);
+    const cfgP = publicConfig().catch(() => null);   // 有快取立即回傳，同時背景更新
+    const cfg = cachedConfigSync() || await cfgP;
+    const showLogin = (survey) => {
+      root.innerHTML = `<header style="margin-top:20px">
+        ${survey.location_name ? `<p class="eyebrow">${esc(survey.location_name)}</p>` : ''}
+        <h1 class="serif" style="margin:12px 0">${esc(survey.title)}</h1></header><div id="loginBox"></div>`;
+      renderGoogleLogin(document.getElementById('loginBox'));
+    };
+    if (cfg && cfg.login_required && !getCustomerToken()) {
+      showLogin((cachedData || await freshP).survey);
+      return;
     }
+    const precheckP = API.get('/api/public/precheck/' + surveyId + '?deviceId=' + encodeURIComponent(did)).catch(() => ({ ok: false }));
+    const data = cachedData || await freshP;
+    renderForm(data.survey, data.questions, cfg && cfg.login_required);
 
+    // 預檢結果回來後補上提示（或授權已過期時改顯示授權卡）
+    let pc = null;
+    precheckP.then(async precheck => {
+      pc = precheck;
+      let needLogin = !!(precheck?.ok && precheck.need_login);
+      if (!precheck?.ok) {
+        const c = await publicConfig().catch(() => null);
+        if (c?.login_required && !getCustomerToken()) needLogin = true;
+      }
+      if (needLogin) { setCustomerToken(null); showLogin(data.survey); return; }
+      applyPrecheck(precheck);
+    });
+    // 快取是舊的：若問卷有更新且尚未開始作答，換成最新內容
+    if (cachedData) freshP.then(fresh => {
+      if (JSON.stringify(fresh) === JSON.stringify(cachedData)) return;
+      if (collectAnswered() > 0 || !document.getElementById('f')) return;
+      renderForm(fresh.survey, fresh.questions, cfg && cfg.login_required);
+      if (pc) applyPrecheck(pc);
+    }).catch(e => {
+      // 問卷已停用／結束等：以後端最新狀態為準
+      if (e && e.status && e.status < 500) root.innerHTML = '<div style="margin-top:24px">' + notice('error', 'alert', esc(e.message), 'alert') + '</div>';
+    });
+  } catch (e) {
+    root.innerHTML = '<div style="margin-top:24px">' + notice('error', 'alert', '無法載入問卷：' + esc(e.message), 'alert') + '</div>';
+  }
+})();
+
+function applyPrecheck(precheck) {
+  const box = document.getElementById('precheckBox');
+  if (!box || !precheck?.ok) return;
+  if (precheck.login_required) { const a = document.getElementById('authLine'); if (a) a.textContent = '已以 Google 帳號授權（系統不保存您的姓名與 Email）。'; }
+  if (precheck.eligible !== false) { box.innerHTML = ''; return; }
+  if (precheck.reason === 'monthly_limit' || precheck.reason === 'interval_not_met') {
+    box.innerHTML = notice('warning', 'clock', `<strong>每個帳號每月限領一次贈品，您本月已兌換過</strong><br>仍歡迎填寫分享意見，本次不會產生兌換券。${precheck.nextDate ? `<br>${esc(precheck.nextDate)} 起可再領取。` : ''}`);
+  } else if (precheck.reason === 'out_of_stock') {
+    box.innerHTML = notice('warning', 'gift', '<strong>本期贈品已兌換完畢</strong><br>仍可填答，本次不發兌換券。');
+  } else if (precheck.reason === 'existing_coupon' && precheck.existingCouponCode) {
+    box.innerHTML = notice('', 'ticket', `<strong>您已有一張未使用的兌換券</strong><br><span class="mono">${esc(precheck.existingCouponCode)}</span><br>
+      <a class="link" href="coupon.html?code=${encodeURIComponent(precheck.existingCouponCode)}">查看兌換券 ${icon('arrow', 18)}</a>
+      <br>填寫此問卷不會再產生新券。`);
+  }
+}
+
+function collectAnswered() {
+  return questions.filter(q => q.question_type !== 'section').filter(q => { const v = collectValue(q); return Array.isArray(v) ? v.length : (v !== '' && v != null); }).length;
+}
+
+function renderForm(survey, qs, loginMode) {
+    questions = qs;
     // 編號邏輯：章節不編號，其餘題目按順序 1, 2, 3...
     let n = 0;
     const items = questions.map(q => {
@@ -197,21 +244,6 @@ function evaluateAllConditions() {
       n++;
       return { html: renderQuestion(q, n) };
     });
-
-    // 啟用 Google 登入時：未登入先顯示登入卡，不顯示題目
-    // 預檢失敗時改讀公開設定：需登入但本機沒有登入憑證 → 一樣先顯示登入
-    let needLogin = !!(precheck?.ok && precheck.need_login);
-    if (!precheck?.ok) {
-      const cfg = await publicConfig().catch(() => null);
-      if (cfg?.login_required && !getCustomerToken()) needLogin = true;
-    }
-    if (needLogin) {
-      root.innerHTML = `<header style="margin-top:20px">
-        ${survey.location_name ? `<p class="eyebrow">${esc(survey.location_name)}</p>` : ''}
-        <h1 class="serif" style="margin:12px 0">${esc(survey.title)}</h1></header><div id="loginBox"></div>`;
-      renderGoogleLogin(document.getElementById('loginBox'));
-      return;
-    }
     const total = questions.filter(q => q.question_type !== 'section').length;
     root.innerHTML = `
       <header style="margin-top:20px">
@@ -224,9 +256,9 @@ function evaluateAllConditions() {
       <div class="card" style="margin-top:24px">
         <div class="between"><strong>填答進度</strong><span id="progText">0／${total} 題</span></div>
         <div class="progress" role="progressbar" aria-label="填答進度" aria-valuemin="0" aria-valuemax="100" id="progBar"><span style="width:0%"></span></div>
-        <p class="muted">${precheck?.login_required ? '已以 Google 帳號授權（系統不保存您的姓名與 Email）。' : '匿名填寫。'}標示「必填」的題目請務必回答。</p>
+        <p class="muted"><span id="authLine">${loginMode ? '已以 Google 帳號授權（系統不保存您的姓名與 Email）。' : '匿名填寫。'}</span>標示「必填」的題目請務必回答。</p>
       </div>
-      <div style="margin-top:16px">${precheckBanner}</div>
+      <div id="precheckBox" style="margin-top:16px"></div>
       <form id="f" novalidate>
         <div class="stack">${items.map(it => it.html).join('')}</div>
         <div id="msg" class="hidden" style="margin-top:24px"></div>
@@ -246,10 +278,7 @@ function evaluateAllConditions() {
     evaluateAllConditions();
     updateProgress();
     loadGiftImages(root);
-  } catch (e) {
-    root.innerHTML = '<div style="margin-top:24px">' + notice('error', 'alert', '無法載入問卷：' + esc(e.message), 'alert') + '</div>';
-  }
-})();
+}
 
 // 填答進度：只計算目前顯示中的題目（章節不計）
 function updateProgress() {

@@ -126,11 +126,11 @@ window.loadGiftImages = function (root) {
   (root || document).querySelectorAll('img[data-gift-img]:not([src])').forEach(async img => {
     const id = img.dataset.giftImg, ver = img.dataset.ver, key = 'giftimg_' + id + '_' + ver;
     let url = null;
-    try { url = sessionStorage.getItem(key); } catch (_) {}
+    try { url = localStorage.getItem(key); } catch (_) {}
     if (!url) {
       try {
         url = (await API.get('/api/public/gift-image/' + id)).data_url;
-        try { sessionStorage.setItem(key, url); } catch (_) {}
+        try { localStorage.setItem(key, url); } catch (_) {}
       } catch (_) { img.remove(); return; }
     }
     img.src = url;
@@ -142,11 +142,24 @@ window.getCustomerToken = function () { try { return localStorage.getItem('surve
 window.setCustomerToken = function (t) { try { t ? localStorage.setItem('survey_ctoken', t) : localStorage.removeItem('survey_ctoken'); } catch (_) {} };
 window.customerLogout = function () { setCustomerToken(null); location.reload(); };
 
-let _publicConfig = null;
-window.publicConfig = async function () {
-  if (!_publicConfig) _publicConfig = await API.get('/api/public/config');
-  return _publicConfig;
+// ===== 本機快取（先顯示上次的內容，背景再向後端更新）=====
+window.cacheRead = function (key) { try { const v = localStorage.getItem('sc_' + key); return v ? JSON.parse(v) : null; } catch (_) { return null; } };
+window.cacheWrite = function (key, val) { try { localStorage.setItem('sc_' + key, JSON.stringify(val)); } catch (_) {} };
+/** 取得資料並寫入快取；回傳 Promise */
+window.fetchAndCache = function (key, path) { return API.get(path).then(d => { cacheWrite(key, d); return d; }); };
+
+let _publicConfigP = null;
+/** 公開設定：有快取就立即回傳（背景更新），沒有才等後端 */
+window.publicConfig = function () {
+  if (!_publicConfigP) {
+    const fresh = fetchAndCache('config', '/api/public/config');
+    const cached = cacheRead('config');
+    _publicConfigP = cached ? Promise.resolve(cached) : fresh;
+    fresh.catch(() => {});
+  }
+  return _publicConfigP;
 };
+window.cachedConfigSync = function () { return cacheRead('config'); };
 
 /** App 內建瀏覽器（LINE、Facebook、Instagram、微信等）：Google 不允許在其中授權 */
 window.isInAppBrowser = function () {
