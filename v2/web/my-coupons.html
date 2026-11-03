@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>我的兌換券</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="config.js?v=3.4.3"></script>
-<script src="js/common.js?v=3.4.3"></script>
-<script src="js/api.js?v=3.4.3"></script>
+<script src="config.js?v=3.4.4"></script>
+<script src="js/common.js?v=3.4.4"></script>
+<script src="js/api.js?v=3.4.4"></script>
 </head>
 <body>
 <div class="customer-shell">
@@ -38,7 +38,7 @@ async function load() {
   const root = document.getElementById('root');
   try {
     const cfg = await publicConfig();
-    if (cfg.login_required && !getCustomerToken()) { renderGoogleLogin(root, '以 Google 帳號授權後，即可查看您的兌換券。'); return; }
+    if (cfg.login_required && !getCustomerToken()) { renderGoogleLogin(root, '授權後即可查看您的兌換券。'); return; }
     if (!cfg.login_required && !did) { root.innerHTML = renderEmpty('尚無兌換券', '完成問卷後，兌換券會顯示在這裡。'); return; }
     const r = await API.get('/api/public/my-coupons?deviceId=' + encodeURIComponent(did));
     if (r.need_login) { setCustomerToken(null); renderGoogleLogin(root, '授權已過期，請重新以 Google 帳號授權。'); return; }
