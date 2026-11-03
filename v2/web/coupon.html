@@ -28,8 +28,9 @@ const root = document.getElementById('root');
     root.innerHTML = ticketHTML(coupon, survey) + termsHTML();
     loadGiftImages(root);
   } catch (e) {
-    root.innerHTML = `<div class="result-state error"><div class="state-symbol">${icon('alert', 32)}</div><h1>查無此兌換券</h1>
-      <p class="muted" style="margin-top:12px">請確認券號是否正確。（${escHtml(e.message)}）</p></div>`;
+    const notFound = e.status === 404 || /not_found/.test(e.message);
+    root.innerHTML = `<div class="result-state error"><div class="state-symbol">${icon('alert', 32)}</div><h1>${notFound ? '查無此兌換券' : '暫時無法讀取兌換券'}</h1>
+      <p class="muted" style="margin-top:12px">${notFound ? '請確認券號是否正確。' : '請確認網路連線後重新整理。'}</p></div>`;
   }
 })();
 </script>
