@@ -110,6 +110,20 @@ function check(name, cond, extra) { results.push([name, !!cond]); console.log((c
   check('後台登入成功', true);
   await page.waitForTimeout(800);
   check('儀表板顯示填答數', (await page.textContent('body')).includes('1'));
+  // G17-C1：1440 → 展開更多統計 → 375 → 1440，不可水平溢出
+  {
+    const sw = () => page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+    await page.setViewportSize({ width: 1440, height: 1000 }); await page.waitForTimeout(400);
+    await page.evaluate(() => { const d = document.getElementById('moreStats'); d.open = true; });
+    await page.waitForTimeout(400);
+    const wide = await page.evaluate(() => { const c = document.getElementById('monthlyChart'); return [c.getBoundingClientRect().width, c.closest('div.bg-white').getBoundingClientRect().width - 34]; });
+    await page.setViewportSize({ width: 375, height: 900 }); await page.waitForTimeout(600);
+    const [a1, b1] = await sw();
+    await page.setViewportSize({ width: 1440, height: 1000 }); await page.waitForTimeout(600);
+    const [a2, b2] = await sw();
+    check(`儀表板縮放不溢出（375：${a1}/${b1}，1440：${a2}/${b2}；展開後月圖 ${Math.round(wide[0])}/${Math.round(wide[1])}）`, a1 <= b1 && a2 <= b2 && wide[0] >= wide[1] - 60);
+    await page.setViewportSize({ width: 390, height: 844 });
+  }
 
   // 5. 贈品庫存頁
   await page.goto(base + '/admin/gifts.html');

@@ -10,6 +10,10 @@
 <script src="../js/api.js?v=3.3.2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
+  /* 圖卡可隨視窗縮小：grid 子元素預設 min-width:auto 會被 canvas 撐住 */
+  .chart-grid > * { min-width: 0; }
+  .chart-grid canvas { max-width: 100%; }
+
   body{font-family:'Noto Sans TC',sans-serif}
   .dl-btn{
     font-size:16px;min-height:44px;color:#234F46;background:#fff;border:1px solid #234F46;
@@ -59,7 +63,7 @@
   </div>
   <div id="cards" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6"></div>
   <div id="neg"></div>
-  <div class="grid md:grid-cols-2 gap-5">
+  <div class="grid md:grid-cols-2 gap-5 chart-grid">
     <div class="bg-white rounded-xl border p-4">
       <div class="flex items-center justify-between mb-3">
         <h3 class="text-sm font-bold">每日填寫趨勢（近 30 天）</h3>
@@ -95,7 +99,7 @@
   </div>
   <details id="moreStats" class="mt-5 bg-white rounded-xl border">
     <summary class="cursor-pointer select-none px-4 py-3 font-bold text-slate-700" style="min-height:44px">更多統計（每月趨勢、評分分布、NPS）</summary>
-    <div class="grid md:grid-cols-2 gap-5 p-4 pt-0">
+    <div class="grid md:grid-cols-2 gap-5 p-4 pt-0 chart-grid">
       <div class="bg-white rounded-xl border p-4">
         <div class="flex items-center justify-between mb-3">
           <h3 class="text-sm font-bold">每月填寫趨勢（近 12 個月）</h3>
@@ -472,11 +476,13 @@ function resetChartSlots() {
   });
 }
 
-document.addEventListener('toggle', e => {
-  if (e.target.id === 'moreStats' && e.target.open && window.Chart) {
-    e.target.querySelectorAll('canvas').forEach(cv => { const ch = Chart.getChart(cv); if (ch) ch.resize(); });
-  }
-}, true);
+// 「更多統計」展開時重新量測圖表（收合狀態下建立的圖會停在舊寬度）
+document.getElementById('moreStats').addEventListener('toggle', e => {
+  if (!e.target.open || !window.Chart) return;
+  const fit = () => e.target.querySelectorAll('canvas').forEach(cv => { const ch = Chart.getChart(cv); if (ch) ch.resize(); });
+  requestAnimationFrame(() => requestAnimationFrame(fit));
+  setTimeout(fit, 300);
+});
 
 function renderDashboard(data) {
   resetChartSlots();
