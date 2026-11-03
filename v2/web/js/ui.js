@@ -166,7 +166,7 @@ window.isInAppBrowser = function () {
   return /FBAN|FBAV|FB_IAB|FBIOS|Instagram|Line\/|MicroMessenger|WhatsApp|Messenger|KAKAOTALK|Threads|Barcelona|; wv\)/i.test(navigator.userAgent || '');
 };
 window.copyPageUrl = async function (btn) {
-  const url = location.href.replace(/[?&]openExternalBrowser=1/, '');
+  const u = new URL(location.href); u.searchParams.delete('openExternalBrowser'); const url = u.toString();
   try { await navigator.clipboard.writeText(url); btn.textContent = '已複製，請貼到 Safari 或 Chrome'; }
   catch (_) { prompt('請複製以下網址，貼到 Safari 或 Chrome 開啟：', url); }
 };
