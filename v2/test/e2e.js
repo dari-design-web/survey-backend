@@ -121,6 +121,8 @@ function check(name, cond, extra) { results.push([name, !!cond]); console.log((c
     const [a1, b1] = await sw();
     await page.setViewportSize({ width: 1440, height: 1000 }); await page.waitForTimeout(600);
     const [a2, b2] = await sw();
+    const back = await page.evaluate(() => ['dailyChart','monthlyChart'].map(id => { const c = document.getElementById(id); return Math.round(c.getBoundingClientRect().width) + '/' + Math.round(c.parentElement.getBoundingClientRect().width); }));
+    check('縮回桌機後圖表貼齊容器：' + back.join('、'), back.every(x => { const [w, p] = x.split('/').map(Number); return w >= p - 4; }));
     check(`儀表板縮放不溢出（375：${a1}/${b1}，1440：${a2}/${b2}；展開後月圖 ${Math.round(wide[0])}/${Math.round(wide[1])}）`, a1 <= b1 && a2 <= b2 && wide[0] >= wide[1] - 60);
     await page.setViewportSize({ width: 390, height: 844 });
   }

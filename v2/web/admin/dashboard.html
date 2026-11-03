@@ -476,6 +476,16 @@ function resetChartSlots() {
   });
 }
 
+// 視窗大小改變（含手機旋轉）：停止拖曳 200ms 後，所有圖表重新量測
+let _resizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(_resizeTimer);
+  _resizeTimer = setTimeout(() => {
+    if (!window.Chart) return;
+    document.querySelectorAll('canvas').forEach(cv => { const ch = Chart.getChart(cv); if (ch) ch.resize(); });
+  }, 200);
+});
+
 // 「更多統計」展開時重新量測圖表（收合狀態下建立的圖會停在舊寬度）
 document.getElementById('moreStats').addEventListener('toggle', e => {
   if (!e.target.open || !window.Chart) return;
