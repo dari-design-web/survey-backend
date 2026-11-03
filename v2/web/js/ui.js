@@ -158,7 +158,10 @@ window.publicConfig = function () {
     fresh.then(d => {
       _publicConfigP = Promise.resolve(d);
       // 後台改了授權設定（開／關或換用戶端 ID）：快取已更新，重新整理一次讓畫面一致
-      if (cached && (!!cached.login_required !== !!d.login_required || cached.google_client_id !== d.google_client_id)) location.reload();
+      // 只有新設定確實寫入本機後才重整，避免儲存空間不足時反覆重整
+      const changed = cached && (!!cached.login_required !== !!d.login_required || cached.google_client_id !== d.google_client_id);
+      const saved = cacheRead('config');
+      if (changed && saved && JSON.stringify(saved) === JSON.stringify(d)) location.reload();
     }).catch(() => {});
   }
   return _publicConfigP;

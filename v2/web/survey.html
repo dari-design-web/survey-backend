@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>填寫問卷</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="config.js?v=3.4.8"></script>
-<script src="js/common.js?v=3.4.8"></script>
-<script src="js/api.js?v=3.4.8"></script>
+<script src="config.js?v=3.4.9"></script>
+<script src="js/common.js?v=3.4.9"></script>
+<script src="js/api.js?v=3.4.9"></script>
 <style>.qtext{white-space:pre-line}.other-input{flex:1;min-width:0;border:0;border-bottom:1px solid var(--edge);padding:4px 8px;background:transparent}.submit-bar{position:sticky;bottom:0;background:var(--paper);padding:16px 0;border-top:1px solid var(--line);margin-top:28px;z-index:10}</style>
 </head>
 <body>
@@ -182,7 +182,13 @@ function evaluateAllConditions() {
     };
     // 背景最新內容若顯示問卷已停用／結束／不存在，改顯示該訊息（所有路徑共用）
     const showClosed = e => {
-      if (e && e.status && e.status < 500) root.innerHTML = '<div style="margin-top:24px">' + notice('error', 'alert', esc(e.message), 'alert') + '</div>';
+      if (e && e.status && e.status < 500) { root.innerHTML = '<div style="margin-top:24px">' + notice('error', 'alert', esc(e.message), 'alert') + '</div>'; return; }
+      // 網路中斷或伺服器忙碌：不清除畫面與已填答案，只在上方提示可重新整理
+      if (document.getElementById('netWarn')) return;
+      const w = document.createElement('div');
+      w.id = 'netWarn'; w.style.marginTop = '16px';
+      w.innerHTML = notice('warning', 'alert', '目前無法確認問卷的最新內容（網路不穩或系統忙碌）。您可以繼續填寫；若送出失敗，請稍後<a class="link" href="javascript:location.reload()">重新整理</a>再試。', 'status');
+      root.prepend(w);
     };
     if (cfg && cfg.login_required && !getCustomerToken()) {
       showLogin((cachedData || await freshP).survey);
