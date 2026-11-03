@@ -11,7 +11,7 @@
  * 版本：見 CODE_VERSION。原始碼來源：GitHub dari-design-web/survey-backend /v2/gas/
  */
 
-var CODE_VERSION = '3.4.0';
+var CODE_VERSION = '3.4.1';
 var GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/dari-design-web/survey-backend/main/v2/gas/';
 var TZ = 'Asia/Taipei';
 var JWT_TTL_HOURS = 8;
@@ -68,7 +68,7 @@ var SCHEMA = {
   },
   admin_users: {
     id: 'n', name: 's', username: 's', email: 's', password_hash: 's', role: 's',
-    is_active: 'n', last_login_at: 's', created_at: 's'
+    is_active: 'n', last_login_at: 's', created_at: 's', deleted_at: 's'
   },
   audit_logs: {
     id: 'n', admin_user_id: 'n', action: 's', target_type: 's', target_id: 's',
@@ -1495,7 +1495,7 @@ function apiGiftLogs(ctx, m) {
 // 後台：帳號
 // ============================================================
 function apiListAdmins() {
-  return { users: Store.all('admin_users').map(function (u) {
+  return { users: Store.all('admin_users').filter(function (u) { return !u.deleted_at; }).map(function (u) {
     var o = {}; for (var k in u) if (k !== 'password_hash') o[k] = u[k]; return o;
   }) };
 }
@@ -1527,7 +1527,7 @@ function apiCreateAdmin(ctx) {
 function apiUpdateAdmin(ctx, m) {
   var id = Number(m[1]);
   var u = Store.get('admin_users', id);
-  if (!u) fail(404, 'not_found');
+  if (!u || u.deleted_at) fail(404, 'not_found');
   var b = ctx.body || {};
   if (b.role && ROLES_ALL.indexOf(b.role) < 0) fail(400, '角色不正確');
   if (id === ctx.user.id && (b.role && b.role !== 'super' || !b.is_active)) fail(400, '不能停用自己或移除自己的超級管理者權限');
@@ -1546,11 +1546,16 @@ function apiUpdateAdmin(ctx, m) {
   return { ok: true };
 }
 
-function apiDeactivateAdmin(ctx, m) {
+/** 刪除帳號：從列表移除、無法再登入，帳號與 Email 釋出可重新使用；保留姓名供歷史紀錄（核銷人、操作紀錄）顯示 */
+function apiDeleteAdmin(ctx, m) {
   var id = Number(m[1]);
+  var u = Store.get('admin_users', id);
+  if (!u || u.deleted_at) fail(404, 'not_found');
   if (id === ctx.user.id) fail(400, '不能刪除自己');
-  Store.update('admin_users', id, { is_active: 0 });
-  audit(ctx, 'deactivate_admin_user', 'admin_user', id);
+  if (u.role === 'super' && Store.find('admin_users', function (x) { return x.role === 'super' && x.is_active && !x.deleted_at && x.id !== id; }).length === 0)
+    fail(400, '至少要保留一個啟用中的超級管理者');
+  Store.update('admin_users', id, { is_active: 0, username: null, email: null, password_hash: '', deleted_at: nowIso() });
+  audit(ctx, 'delete_admin_user', 'admin_user', id, { name: u.name });
   return { ok: true };
 }
 
@@ -2097,7 +2102,7 @@ var ROUTES = [
   ['GET', /^\/api\/admin\/admin-users$/, apiListAdmins, ['super'], false],
   ['POST', /^\/api\/admin\/admin-users$/, apiCreateAdmin, ['super'], true],
   ['PUT', /^\/api\/admin\/admin-users\/(\d+)$/, apiUpdateAdmin, ['super'], true],
-  ['DELETE', /^\/api\/admin\/admin-users\/(\d+)$/, apiDeactivateAdmin, ['super'], true],
+  ['DELETE', /^\/api\/admin\/admin-users\/(\d+)$/, apiDeleteAdmin, ['super'], true],
   ['GET', /^\/api\/admin\/export\/(.+)$/, handleExport, ROLES_MGR, true],
   ['GET', /^\/api\/admin\/system$/, apiSystemInfo, ['super'], false],
   ['POST', /^\/api\/admin\/system\/update$/, apiSystemUpdate, ['super'], true],

@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>管理者帳號</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="../config.js?v=3.4.0"></script>
-<script src="../js/common.js?v=3.4.0"></script>
-<script src="../js/api.js?v=3.4.0"></script>
+<script src="../config.js?v=3.4.1"></script>
+<script src="../js/common.js?v=3.4.1"></script>
+<script src="../js/api.js?v=3.4.1"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
 <script>renderAdminHeader('users');</script>
@@ -33,7 +33,7 @@
     <table class="w-full text-sm">
       <thead class="bg-slate-50 text-xs uppercase text-slate-500">
         <tr><th class="px-4 py-3 text-left">ID</th><th class="px-4 py-3 text-left">姓名</th>
-        <th class="px-4 py-3 text-left">帳號／Email</th><th class="px-4 py-3 text-center">角色</th>
+        <th class="px-4 py-3 text-left">登入帳號</th><th class="px-4 py-3 text-left">Email</th><th class="px-4 py-3 text-center">角色</th>
         <th class="px-4 py-3 text-center">啟用</th><th class="px-4 py-3 text-left">最近登入</th>
         <th class="px-4 py-3 text-center">操作</th></tr>
       </thead>
@@ -65,7 +65,8 @@ async function load() {
     <tr class="hover:bg-slate-50">
       <td class="px-4 py-3 text-slate-500">${u.id}</td>
       <td class="px-4 py-3 font-medium">${esc(u.name)}</td>
-      <td class="px-4 py-3 text-xs"><span class="mono">${esc(u.username || '')}</span>${u.username && u.email ? '<br>' : ''}${esc(u.email || '')}</td>
+      <td class="px-4 py-3 font-medium">${u.username ? esc(u.username) : '<span class="text-slate-400">—</span>'}</td>
+      <td class="px-4 py-3 text-slate-500">${u.email ? esc(u.email) : '<span class="text-slate-400">—</span>'}</td>
       <td class="px-4 py-3 text-center text-xs">${esc(u.role)}</td>
       <td class="px-4 py-3 text-center">${u.is_active ? '✓' : '—'}</td>
       <td class="px-4 py-3 text-xs">${esc(fmtTpe(u.last_login_at))}</td>
@@ -75,6 +76,8 @@ async function load() {
         <button onclick="resetPw(${u.id}, ${JSON.stringify(u.name).replace(/"/g,'&quot;')}, '${u.role}', ${!!u.is_active})" class="text-amber-600 hover:underline">重設密碼</button>
         <span class="text-slate-300 mx-1">|</span>
         <button onclick="toggleA(${u.id}, ${JSON.stringify(u.name).replace(/"/g,'&quot;')}, '${u.role}', ${!!u.is_active})" class="text-slate-600 hover:underline">${u.is_active ? '停用' : '啟用'}</button>
+        <span class="text-slate-300 mx-1">|</span>
+        <button onclick="delUser(${u.id}, ${JSON.stringify(u.name).replace(/"/g,'&quot;')})" class="text-red-700 hover:underline">刪除</button>
       </td>
     </tr>`).join('');
 }
@@ -96,6 +99,10 @@ async function resetPw(id, name, role, active) {
   if (!password || password.length < 8) return alert('密碼至少 8 字');
   await API.put('/api/admin/admin-users/' + id, { name, role, is_active: active, password });
   alert('已重設');
+}
+async function delUser(id, name) {
+  if (!confirm('確定刪除「' + name + '」？\n刪除後無法再登入，帳號與 Email 可重新給別人使用；過去的核銷與操作紀錄仍會保留此姓名。')) return;
+  try { await API.del('/api/admin/admin-users/' + id); load(); } catch (e) { alert(e.message); }
 }
 async function toggleA(id, name, role, active) {
   await API.put('/api/admin/admin-users/' + id, { name, role, is_active: !active });

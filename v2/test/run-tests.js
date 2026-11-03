@@ -593,6 +593,17 @@ test('後台帳號：可只建帳號不填 Email，用帳號或 Email 登入', (
   assert.strictEqual(lg('staff01', 'wrongpass').status, 401);
   // 舊版前端以 email 欄位送出、舊帳號用 Email 登入仍可
   assert.strictEqual(c.env.dispatch({ method: 'POST', path: '/api/auth/login', body: { email: 'dari25420001@gmail.com', password: c.pw } }).status, 200);
+  // 刪除：從列表消失、不能登入、舊 token 失效、帳號可重新使用；不能刪自己
+  const list = () => api(c.env, 'GET', '/api/admin/admin-users', null, c.T).body.users;
+  const sid = list().find(u => u.username === 'staff01').id;
+  const st = r.body.token;
+  assert.strictEqual(api(c.env, 'DELETE', '/api/admin/admin-users/' + sid, null, c.T).status, 200);
+  assert.ok(!list().some(u => u.id === sid));
+  assert.strictEqual(lg('staff01', 'abcd1234').status, 401);
+  assert.strictEqual(api(c.env, 'GET', '/api/redeem/lookup?code=X', null, st).status, 401);
+  assert.strictEqual(mk({ name: '新人', username: 'staff01', password: 'abcd1234', role: 'staff' }).status, 200);
+  const me = list().find(u => u.role === 'super').id;
+  assert.strictEqual(api(c.env, 'DELETE', '/api/admin/admin-users/' + me, null, c.T).status, 400);
 });
 
 console.log('\n後台與匯出');
