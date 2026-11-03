@@ -148,9 +148,31 @@ window.publicConfig = async function () {
   return _publicConfig;
 };
 
+/** App 內建瀏覽器（LINE、Facebook、Instagram、微信等）：Google 不允許在其中授權 */
+window.isInAppBrowser = function () {
+  return /FBAN|FBAV|FB_IAB|FBIOS|Instagram|Line\/|MicroMessenger|WhatsApp|Messenger|KAKAOTALK|Threads|Barcelona|; wv\)/i.test(navigator.userAgent || '');
+};
+window.copyPageUrl = async function (btn) {
+  const url = location.href.replace(/[?&]openExternalBrowser=1/, '');
+  try { await navigator.clipboard.writeText(url); btn.textContent = '已複製，請貼到 Safari 或 Chrome'; }
+  catch (_) { prompt('請複製以下網址，貼到 Safari 或 Chrome 開啟：', url); }
+};
+
 /** 在 container 內顯示「以 Google 帳號登入」卡片；登入成功後重新載入頁面 */
 window.renderGoogleLogin = async function (container, reason) {
   const cfg = await publicConfig();
+  if (isInAppBrowser()) {
+    container.innerHTML = `<div class="card" style="margin-top:24px;text-align:center">
+      <div class="state-symbol">${icon('alert', 32)}</div>
+      <h2>請改用 Safari 或 Chrome 開啟</h2>
+      <p class="muted" style="margin:8px 0 16px">目前是在 App 內建的瀏覽器中，Google 不允許在這裡授權。</p>
+      <ol style="text-align:left;margin:0 auto 16px;max-width:320px;line-height:1.9">
+        <li>點右上角「⋯」或分享圖示</li>
+        <li>選「在瀏覽器開啟」或「以 Safari 開啟」</li>
+      </ol>
+      <button type="button" class="btn btn-secondary" onclick="copyPageUrl(this)">複製網址</button></div>`;
+    return;
+  }
   container.innerHTML = `<div class="card" style="margin-top:24px;text-align:center">
     <div class="state-symbol">${icon('users', 32)}</div>
     <h2>請先以 Google 帳號授權</h2>

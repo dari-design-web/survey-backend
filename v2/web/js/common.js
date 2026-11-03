@@ -1,5 +1,11 @@
 // 共用：Tailwind 設定、後台 header 注入、登出
 (function () {
+  // LINE 內建瀏覽器不支援 Google 授權：自動改用手機預設瀏覽器（Safari／Chrome）開啟
+  try {
+    if (/\bLine\//i.test(navigator.userAgent) && !/[?&]openExternalBrowser=1/.test(location.search)) {
+      location.replace(location.href.replace(/#.*$/, '') + (location.search ? '&' : '?') + 'openExternalBrowser=1' + location.hash);
+    }
+  } catch (_) {}
   // 共用樣式與元件（設計系統 v2/design）：由本檔自動載入，各頁不必個別引用
   const base = (document.currentScript && document.currentScript.src || '').replace(/js\/common\.js.*$/, '');
   const V = (document.currentScript && (document.currentScript.src.match(/\?v=([^&]+)/) || [])[1]) || '';
