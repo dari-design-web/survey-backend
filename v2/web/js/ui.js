@@ -152,10 +152,14 @@ let _publicConfigP = null;
 /** 公開設定：有快取就立即回傳（背景更新），沒有才等後端 */
 window.publicConfig = function () {
   if (!_publicConfigP) {
-    const fresh = fetchAndCache('config', '/api/public/config');
     const cached = cacheRead('config');
+    const fresh = fetchAndCache('config', '/api/public/config');
     _publicConfigP = cached ? Promise.resolve(cached) : fresh;
-    fresh.catch(() => {});
+    fresh.then(d => {
+      _publicConfigP = Promise.resolve(d);
+      // 後台改了授權設定（開／關或換用戶端 ID）：快取已更新，重新整理一次讓畫面一致
+      if (cached && (!!cached.login_required !== !!d.login_required || cached.google_client_id !== d.google_client_id)) location.reload();
+    }).catch(() => {});
   }
   return _publicConfigP;
 };

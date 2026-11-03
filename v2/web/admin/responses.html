@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>問卷填答資料</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="../config.js?v=3.4.7"></script>
-<script src="../js/common.js?v=3.4.7"></script>
-<script src="../js/api.js?v=3.4.7"></script>
+<script src="../config.js?v=3.4.8"></script>
+<script src="../js/common.js?v=3.4.8"></script>
+<script src="../js/api.js?v=3.4.8"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
 <script>renderAdminHeader('responses');</script>
@@ -113,8 +113,8 @@ async function detail(rid) {
         <div class="border-b pb-2 text-sm">
           <div class="text-slate-500 text-xs">${a.sort_order}. ${esc(a.question_text)} (${a.question_type})</div>
           <div class="text-brand-700">${
-            a.question_type === 'rating' ? '⭐ ' + (a.answer_value != null ? a.answer_value + ' / 5' : '—') :
-            a.question_type === 'multiple' ? (() => { try { return JSON.parse(a.answer_text||'[]').join('、'); } catch(_) { return esc(a.answer_text); }})() :
+            a.question_type === 'rating' ? (a.answer_value != null ? '⭐ ' + esc(a.answer_value) + ' / 5' : (a.answer_text ? esc(a.answer_text) : '—')) :
+            a.question_type === 'multiple' ? (() => { try { const v = JSON.parse(a.answer_text || '[]'); return esc(Array.isArray(v) ? v.join('、') : String(v)); } catch(_) { return esc(a.answer_text); }})() :
             esc(a.answer_text || '—')
           }</div>
         </div>`).join('')}</div>

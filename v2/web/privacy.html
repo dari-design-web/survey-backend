@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>隱私權聲明｜滿意度調查系統</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="config.js?v=3.4.7"></script>
-<script src="js/common.js?v=3.4.7"></script>
-<script src="js/api.js?v=3.4.7"></script>
+<script src="config.js?v=3.4.8"></script>
+<script src="js/common.js?v=3.4.8"></script>
+<script src="js/api.js?v=3.4.8"></script>
 </head>
 <body class="bg-slate-50 text-slate-800">
 <main class="max-w-2xl mx-auto px-5 py-8">
@@ -61,7 +61,7 @@
     <ul class="list-disc list-inside text-sm leading-relaxed space-y-1">
       <li><strong>兌換券</strong>：已兌換、逾期或作廢超過 30 天者，不再顯示於「我的兌換券」頁面；紀錄仍保留於後台，供統計與贈品庫存對帳使用</li>
             <li><strong>問卷填答內容與兌換紀錄</strong>：保存期間依主辦單位規定辦理（公告前以服務改善與統計所需期間為限）</li>
-      <li><strong>您的裝置識別碼</strong>：存於您的瀏覽器，您可隨時自行清除；清除後將無法在此裝置查看先前的兌換券，但不會刪除系統中已保存的填答與兌換紀錄</li>
+      <li><strong>您手機瀏覽器中的資料</strong>：您可隨時自行清除。以 Google 帳號授權時，清除後再以同一個 Google 帳號授權，即可再次查看先前的兌換券；未啟用 Google 授權（以裝置識別）時，清除後將無法在此裝置查看先前的兌換券。清除本機資料不會刪除系統中已保存的填答與兌換紀錄</li>
     </ul>
   </section>
 
@@ -85,11 +85,12 @@
   <section class="bg-white border border-slate-200 rounded-xl p-6 mb-4">
     <h2 class="text-lg font-bold text-brand-700 mb-2">六、Cookie 與類似技術</h2>
     <p class="text-sm leading-relaxed">
-      本系統使用瀏覽器的本機儲存（<code class="bg-slate-100 px-1 rounded">localStorage</code>）保存裝置識別碼，不使用 cookie 保存；僅用於：
+      本系統使用瀏覽器的本機儲存（<code class="bg-slate-100 px-1 rounded">localStorage</code>），不使用 cookie 保存以下資料：
     </p>
     <ul class="list-disc list-inside text-sm leading-relaxed mt-2 space-y-1">
-      <li>避免同一裝置短期內重複領取兌換券</li>
-      <li>讓您可在「我的兌換券」查看自己的歷史紀錄</li>
+      <li><strong>Google 授權憑證</strong>：您以 Google 帳號授權後，本系統發給此瀏覽器的登入憑證（有效 30 天），用於辨識同一帳號、判斷每月限領並查看您的兌換券；可於「我的兌換券」點「取消此裝置的 Google 授權」清除</li>
+      <li><strong>裝置識別碼</strong>：瀏覽器隨機產生的亂數，未啟用 Google 授權時用來辨識同一裝置</li>
+      <li><strong>畫面快取</strong>：問卷內容、系統設定與贈品圖片的暫存，讓下次開啟更快；不含您的填答內容</li>
     </ul>
     <p class="text-sm leading-relaxed mt-2">您可隨時於瀏覽器設定中清除這些資料。</p>
   </section>

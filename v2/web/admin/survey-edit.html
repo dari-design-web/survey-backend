@@ -6,9 +6,9 @@
 <title>編輯問卷</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
-<script src="../config.js?v=3.4.7"></script>
-<script src="../js/common.js?v=3.4.7"></script>
-<script src="../js/api.js?v=3.4.7"></script>
+<script src="../config.js?v=3.4.8"></script>
+<script src="../js/common.js?v=3.4.8"></script>
+<script src="../js/api.js?v=3.4.8"></script>
 <style>
   /* 題目卡：自動編號（拖曳後也會更新）、章節淡綠底 */
   #qList { counter-reset: qn; }
@@ -138,7 +138,7 @@
     </div>
     <p class="text-xs text-slate-500 mb-3 leading-relaxed">
       📌 提示：選項中包含「其他」二字者，前台會自動顯示一個文字輸入欄；<br>
-      📌 評分題（1-5）前台會自動附加「未使用／不適用」選項；<br>
+      📌 評分題（1-5）是否提供「未使用／不適用」，由各題「評分說明」第 3 行決定；<br>
       📌 章節題（section）作為分段標題，不必填、不計入統計。
     </p>
     <div id="qList" class="space-y-3"></div>
@@ -179,7 +179,7 @@ const TYPE_OPTIONS = [
   ['section', '【章節標題】'],
   ['single',   '單選題'],
   ['multiple', '複選題'],
-  ['rating',   '評分 1-5（含未使用）'],
+  ['rating',   '評分 1-5'],
   ['nps',      'NPS 0-10'],
   ['text',     '短文字'],
   ['textarea', '長文字'],

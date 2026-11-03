@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>填寫問卷</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="config.js?v=3.4.7"></script>
-<script src="js/common.js?v=3.4.7"></script>
-<script src="js/api.js?v=3.4.7"></script>
+<script src="config.js?v=3.4.8"></script>
+<script src="js/common.js?v=3.4.8"></script>
+<script src="js/api.js?v=3.4.8"></script>
 <style>.qtext{white-space:pre-line}.other-input{flex:1;min-width:0;border:0;border-bottom:1px solid var(--edge);padding:4px 8px;background:transparent}.submit-bar{position:sticky;bottom:0;background:var(--paper);padding:16px 0;border-top:1px solid var(--line);margin-top:28px;z-index:10}</style>
 </head>
 <body>
@@ -180,8 +180,13 @@ function evaluateAllConditions() {
         <h1 class="serif" style="margin:12px 0">${esc(survey.title)}</h1></header><div id="loginBox"></div>`;
       renderGoogleLogin(document.getElementById('loginBox'));
     };
+    // 背景最新內容若顯示問卷已停用／結束／不存在，改顯示該訊息（所有路徑共用）
+    const showClosed = e => {
+      if (e && e.status && e.status < 500) root.innerHTML = '<div style="margin-top:24px">' + notice('error', 'alert', esc(e.message), 'alert') + '</div>';
+    };
     if (cfg && cfg.login_required && !getCustomerToken()) {
       showLogin((cachedData || await freshP).survey);
+      if (cachedData) freshP.then(fresh => { if (JSON.stringify(fresh.survey) !== JSON.stringify(cachedData.survey)) showLogin(fresh.survey); }).catch(showClosed);
       return;
     }
     const precheckP = API.get('/api/public/precheck/' + surveyId + '?deviceId=' + encodeURIComponent(did)).catch(() => ({ ok: false }));
@@ -206,10 +211,7 @@ function evaluateAllConditions() {
       if (collectAnswered() > 0 || !document.getElementById('f')) return;
       renderForm(fresh.survey, fresh.questions, cfg && cfg.login_required);
       if (pc) applyPrecheck(pc);
-    }).catch(e => {
-      // 問卷已停用／結束等：以後端最新狀態為準
-      if (e && e.status && e.status < 500) root.innerHTML = '<div style="margin-top:24px">' + notice('error', 'alert', esc(e.message), 'alert') + '</div>';
-    });
+    }).catch(showClosed);
   } catch (e) {
     root.innerHTML = '<div style="margin-top:24px">' + notice('error', 'alert', '無法載入問卷：' + esc(e.message), 'alert') + '</div>';
   }
