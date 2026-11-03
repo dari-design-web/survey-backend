@@ -156,7 +156,7 @@ window.renderGoogleLogin = async function (container, reason) {
     <h2>請先以 Google 帳號授權</h2>
     <p class="muted" style="margin:8px 0 20px">${escHtml(reason || '為確保每個帳號每月限領一次贈品，填寫前請以 Google 帳號授權確認身分。系統只用來辨識帳號，不會取得您的密碼，也不保存姓名與 Email。')}</p>
     <div id="gBtn" style="display:flex;justify-content:center;min-height:44px"></div>
-    <p class="muted" style="margin-top:16px">系統只保存帳號的加密識別碼，不保存您的姓名、Email 或照片。</p>
+    <p class="muted" style="margin-top:16px">授權只用來確認是同一個帳號，系統不會取得您的密碼，也不保存姓名、Email 或照片。</p>
     <div id="gErr" role="alert" style="color:var(--red);margin-top:12px"></div></div>`;
   const start = () => {
     google.accounts.id.initialize({
