@@ -11,7 +11,7 @@
  * 版本：見 CODE_VERSION。原始碼來源：GitHub dari-design-web/survey-backend /v2/gas/
  */
 
-var CODE_VERSION = '3.3.2';
+var CODE_VERSION = '3.4.0';
 var GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/dari-design-web/survey-backend/main/v2/gas/';
 var TZ = 'Asia/Taipei';
 var JWT_TTL_HOURS = 8;
@@ -67,7 +67,7 @@ var SCHEMA = {
     status_after: 's', admin_user_id: 'n', note: 's', created_at: 's'
   },
   admin_users: {
-    id: 'n', name: 's', email: 's', password_hash: 's', role: 's',
+    id: 'n', name: 's', username: 's', email: 's', password_hash: 's', role: 's',
     is_active: 'n', last_login_at: 's', created_at: 's'
   },
   audit_logs: {
@@ -980,13 +980,14 @@ function apiSubmitSurvey(ctx) {
 // ============================================================
 function apiLogin(ctx) {
   var b = ctx.body || {};
-  var email = str(b.email).trim().toLowerCase(), pw = str(b.password);
-  if (!email || !pw) fail(400, '缺少帳號或密碼');
+  // 可用「帳號」或「Email」登入（舊版前端送 email 欄位）
+  var ident = str(b.login || b.email).trim().toLowerCase(), pw = str(b.password);
+  if (!ident || !pw) fail(400, '缺少帳號或密碼');
   var cache = CacheService.getScriptCache();
-  var key = 'loginfail:' + email;
+  var key = 'loginfail:' + ident;
   var fails = Number(cache.get(key) || 0);
   if (fails >= 5) fail(429, '登入失敗次數過多，請 10 分鐘後再試');
-  var u = Store.findOne('admin_users', function (x) { return str(x.email).toLowerCase() === email; });
+  var u = findAdminByLogin(ident);
   if (!u || !u.is_active || !verifyPassword(pw, u.password_hash)) {
     cache.put(key, String(fails + 1), 600);
     fail(401, '帳號或密碼錯誤');
@@ -995,6 +996,15 @@ function apiLogin(ctx) {
   Store.update('admin_users', u.id, { last_login_at: nowIso() });
   var user = { id: u.id, name: u.name, email: u.email, role: u.role };
   return { ok: true, token: signToken(user), user: user };
+}
+
+/** 以帳號或 Email 找管理者（不分大小寫） */
+function findAdminByLogin(ident) {
+  ident = str(ident).trim().toLowerCase();
+  if (!ident) return null;
+  return Store.findOne('admin_users', function (x) {
+    return str(x.username).toLowerCase() === ident || str(x.email).toLowerCase() === ident;
+  });
 }
 
 // ============================================================
@@ -1496,13 +1506,18 @@ function checkPasswordStrength(pw) {
 
 function apiCreateAdmin(ctx) {
   var b = ctx.body || {};
+  var username = str(b.username).trim().toLowerCase();
   var email = str(b.email).trim().toLowerCase();
-  if (!b.name || !email || !b.password || !b.role) fail(400, '必填欄位不完整');
+  if (!b.name || !b.password || !b.role) fail(400, '請填寫姓名、密碼與角色');
+  if (!username && !email) fail(400, '請填寫登入帳號');
+  if (username && !/^[a-z0-9._-]{3,30}$/.test(username)) fail(400, '帳號限 3–30 個英文字母、數字或 . _ -');
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) fail(400, 'Email 格式不正確');
   if (ROLES_ALL.indexOf(b.role) < 0) fail(400, '角色不正確');
   checkPasswordStrength(b.password);
-  if (Store.findOne('admin_users', function (x) { return str(x.email).toLowerCase() === email; })) fail(400, '此 Email 已存在');
+  if (username && findAdminByLogin(username)) fail(400, '此帳號已有人使用');
+  if (email && findAdminByLogin(email)) fail(400, '此 Email 已有人使用');
   var u = Store.insert('admin_users', {
-    name: b.name, email: email, password_hash: hashPassword(b.password), role: b.role,
+    name: b.name, username: username || null, email: email || null, password_hash: hashPassword(b.password), role: b.role,
     is_active: 1, last_login_at: null, created_at: nowIso()
   });
   audit(ctx, 'create_admin_user', 'admin_user', u.id);
@@ -1518,6 +1533,14 @@ function apiUpdateAdmin(ctx, m) {
   if (id === ctx.user.id && (b.role && b.role !== 'super' || !b.is_active)) fail(400, '不能停用自己或移除自己的超級管理者權限');
   var patch = { name: b.name || u.name, role: b.role || u.role, is_active: bool01(b.is_active) };
   if (b.password) { checkPasswordStrength(b.password); patch.password_hash = hashPassword(b.password); }
+  if (b.username !== undefined) {
+    var un = str(b.username).trim().toLowerCase();
+    if (un && !/^[a-z0-9._-]{3,30}$/.test(un)) fail(400, '帳號限 3–30 個英文字母、數字或 . _ -');
+    var other = un && findAdminByLogin(un);
+    if (other && other.id !== id) fail(400, '此帳號已有人使用');
+    if (!un && !u.email) fail(400, '沒有 Email 的帳號不能清空登入帳號');
+    patch.username = un || null;
+  }
   Store.update('admin_users', id, patch);
   audit(ctx, 'update_admin_user', 'admin_user', id);
   return { ok: true };

@@ -579,6 +579,22 @@ test('評分題：可自訂兩端說明、可關閉「未使用／不適用」',
   assert.strictEqual(send(4, 'rC').status, 200);
 });
 
+test('後台帳號：可只建帳號不填 Email，用帳號或 Email 登入', () => {
+  const c = boot();
+  const mk = body => api(c.env, 'POST', '/api/admin/admin-users', body, c.T);
+  assert.strictEqual(mk({ name: '現場一', username: 'Staff01', password: 'abcd1234', role: 'staff' }).status, 200);
+  assert.strictEqual(mk({ name: '重複', username: 'staff01', password: 'abcd1234', role: 'staff' }).status, 400);
+  assert.strictEqual(mk({ name: '格式錯', username: 'a b', password: 'abcd1234', role: 'staff' }).status, 400);
+  assert.strictEqual(mk({ name: '都沒填', password: 'abcd1234', role: 'staff' }).status, 400);
+  const lg = (login, password) => c.env.dispatch({ method: 'POST', path: '/api/auth/login', body: { login, password } });
+  const r = lg('STAFF01', 'abcd1234');
+  assert.strictEqual(r.status, 200, JSON.stringify(r.body));
+  assert.strictEqual(r.body.user.role, 'staff');
+  assert.strictEqual(lg('staff01', 'wrongpass').status, 401);
+  // 舊版前端以 email 欄位送出、舊帳號用 Email 登入仍可
+  assert.strictEqual(c.env.dispatch({ method: 'POST', path: '/api/auth/login', body: { email: 'dari25420001@gmail.com', password: c.pw } }).status, 200);
+});
+
 console.log('\n後台與匯出');
 test('儀表板、意見、兌換券列表、我的兌換券', () => {
   const c = boot();

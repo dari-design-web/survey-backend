@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>管理者登入</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="../config.js?v=3.3.2"></script>
-<script src="../js/common.js?v=3.3.2"></script>
-<script src="../js/api.js?v=3.3.2"></script>
+<script src="../config.js?v=3.4.0"></script>
+<script src="../js/common.js?v=3.4.0"></script>
+<script src="../js/api.js?v=3.4.0"></script>
 </head>
 <body>
 <div class="login-layout">
@@ -23,7 +23,7 @@
     <p class="muted" style="margin-top:8px">請使用管理者提供的帳號登入。</p>
     <form id="f" novalidate>
       <div id="err" class="hidden" role="alert" style="margin-bottom:20px"></div>
-      <label class="field" for="e"><span>Email</span><input type="email" id="e" required autocomplete="username" class="input"></label>
+      <label class="field" for="e"><span>帳號或 Email</span><input type="text" id="e" required autocomplete="username" autocapitalize="none" spellcheck="false" class="input"></label>
       <label class="field" for="p"><span>密碼</span><input type="password" id="p" required autocomplete="current-password" class="input"></label>
       <button type="submit" id="btn" class="btn btn-primary primary-action full">登入</button>
     </form>
@@ -40,7 +40,7 @@ document.getElementById('f').addEventListener('submit', async e => {
   btn.disabled = true; btn.textContent = '登入中…';
   try {
     const r = await API.post('/api/auth/login', {
-      email: document.getElementById('e').value.trim(),
+      login: document.getElementById('e').value.trim(),
       password: document.getElementById('p').value
     });
     API.setToken(r.token);
