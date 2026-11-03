@@ -13,6 +13,12 @@
   /* 圖卡可隨視窗縮小：grid 子元素預設 min-width:auto 會被 canvas 撐住 */
   .chart-grid > * { min-width: 0; }
   .chart-grid canvas { max-width: 100%; }
+  #dailyChartBox, #monthlyChartBox { height: 220px; }
+  #satChartBox { height: 340px; }
+  #distChartBox, #kwChartBox { height: 260px; }
+  #npsChartBox { height: 220px; }
+  #couponBox { height: 220px; }
+  [id^="cat_"][id$="_box"] { height: 240px; }
 
   body{font-family:'Noto Sans TC',sans-serif}
   .dl-btn{
@@ -161,6 +167,8 @@ if (window.Chart) {
   Chart.defaults.font.size = 16;
   Chart.defaults.color = '#53645B';
   Chart.defaults.borderColor = '#D9DFD8';
+  // 圖高由外框決定（固定高度），手機縮放時不會被長寬比壓扁
+  Chart.defaults.maintainAspectRatio = false;
 }
 
 function lineChart(id, labels, values, label){

@@ -119,6 +119,8 @@ function check(name, cond, extra) { results.push([name, !!cond]); console.log((c
     const wide = await page.evaluate(() => { const c = document.getElementById('monthlyChart'); return [c.getBoundingClientRect().width, c.closest('div.bg-white').getBoundingClientRect().width - 34]; });
     await page.setViewportSize({ width: 375, height: 900 }); await page.waitForTimeout(600);
     const [a1, b1] = await sw();
+    const hs = await page.evaluate(() => ['npsChart','dailyChart','monthlyChart'].map(id => Math.round(document.getElementById(id).getBoundingClientRect().height)));
+    check('手機寬度圖表高度足夠（NPS／每日／每月：' + hs.join('／') + 'px）', hs.every(h => h >= 150));
     await page.setViewportSize({ width: 1440, height: 1000 }); await page.waitForTimeout(600);
     const [a2, b2] = await sw();
     const back = await page.evaluate(() => ['dailyChart','monthlyChart'].map(id => { const c = document.getElementById(id); return Math.round(c.getBoundingClientRect().width) + '/' + Math.round(c.parentElement.getBoundingClientRect().width); }));
