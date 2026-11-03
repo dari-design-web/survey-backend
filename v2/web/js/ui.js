@@ -153,8 +153,8 @@ window.renderGoogleLogin = async function (container, reason) {
   const cfg = await publicConfig();
   container.innerHTML = `<div class="card" style="margin-top:24px;text-align:center">
     <div class="state-symbol">${icon('users', 32)}</div>
-    <h2>請先登入</h2>
-    <p class="muted" style="margin:8px 0 20px">${escHtml(reason || '為確保每個帳號每月限領一次贈品，填寫問卷前請以 Google 帳號登入。')}</p>
+    <h2>請先以 Google 帳號授權</h2>
+    <p class="muted" style="margin:8px 0 20px">${escHtml(reason || '為確保每個帳號每月限領一次贈品，填寫前請以 Google 帳號授權確認身分。系統只用來辨識帳號，不會取得您的密碼，也不保存姓名與 Email。')}</p>
     <div id="gBtn" style="display:flex;justify-content:center;min-height:44px"></div>
     <p class="muted" style="margin-top:16px">系統只保存帳號的加密識別碼，不保存您的姓名、Email 或照片。</p>
     <div id="gErr" role="alert" style="color:var(--red);margin-top:12px"></div></div>`;
@@ -166,16 +166,16 @@ window.renderGoogleLogin = async function (container, reason) {
           const r = await API.post('/api/public/login/google', { credential: resp.credential });
           setCustomerToken(r.ctoken);
           location.reload();
-        } catch (e) { document.getElementById('gErr').textContent = '登入失敗：' + e.message; }
+        } catch (e) { document.getElementById('gErr').textContent = '授權失敗：' + e.message; }
       }
     });
-    google.accounts.id.renderButton(document.getElementById('gBtn'), { theme: 'outline', size: 'large', text: 'signin_with', shape: 'pill', locale: 'zh-TW' });
+    google.accounts.id.renderButton(document.getElementById('gBtn'), { theme: 'outline', size: 'large', text: 'continue_with', shape: 'pill', locale: 'zh-TW' });
   };
   if (window.google && google.accounts && google.accounts.id) return start();
   const sc = document.createElement('script');
   sc.src = 'https://accounts.google.com/gsi/client';
   sc.async = true;
   sc.onload = start;
-  sc.onerror = () => { document.getElementById('gErr').textContent = '無法載入 Google 登入，請確認網路後重新整理。'; };
+  sc.onerror = () => { document.getElementById('gErr').textContent = '無法載入 Google 授權，請確認網路後重新整理。'; };
   document.head.appendChild(sc);
 };

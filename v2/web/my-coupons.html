@@ -23,7 +23,8 @@
     </div>
     <div id="root" class="stack" style="margin-top:16px"><p class="muted">載入中…</p></div>
     <div id="logoutBox" style="margin-top:16px"></div>
-    <div style="margin-top:32px"><script>document.write(notice('', 'info', '本系統採匿名方式，只以此裝置的識別碼對應您的兌換券；換手機或清除瀏覽器資料後將無法查看。'))</script></div>
+    <div style="margin-top:32px"><div id="idNote"></div><script>document.getElementById('idNote').innerHTML = notice('', 'info', '本系統採匿名方式，只以此裝置的識別碼對應您的兌換券；換手機或清除瀏覽器資料後將無法查看。');
+publicConfig().then(c => { if (c && c.login_required) document.getElementById('idNote').innerHTML = notice('', 'info', '兌換券依您的 Google 帳號保存；換手機時，以同一個 Google 帳號授權即可查看。系統不保存您的姓名與 Email。'); }).catch(() => {});</script></div>
   </main>
   <script>document.write(bottomNav('coupons'))</script>
 </div>
@@ -37,11 +38,11 @@ async function load() {
   const root = document.getElementById('root');
   try {
     const cfg = await publicConfig();
-    if (cfg.login_required && !getCustomerToken()) { renderGoogleLogin(root, '登入 Google 帳號即可查看您的兌換券。'); return; }
+    if (cfg.login_required && !getCustomerToken()) { renderGoogleLogin(root, '以 Google 帳號授權後，即可查看您的兌換券。'); return; }
     if (!cfg.login_required && !did) { root.innerHTML = renderEmpty('尚無兌換券', '完成問卷後，兌換券會顯示在這裡。'); return; }
     const r = await API.get('/api/public/my-coupons?deviceId=' + encodeURIComponent(did));
-    if (r.need_login) { setCustomerToken(null); renderGoogleLogin(root, '登入已過期，請重新登入 Google 帳號。'); return; }
-    if (cfg.login_required) document.getElementById('logoutBox').innerHTML = `<button type="button" class="btn btn-plain" onclick="customerLogout()">登出 Google 帳號</button>`;
+    if (r.need_login) { setCustomerToken(null); renderGoogleLogin(root, '授權已過期，請重新以 Google 帳號授權。'); return; }
+    if (cfg.login_required) document.getElementById('logoutBox').innerHTML = `<button type="button" class="btn btn-plain" onclick="customerLogout()">取消此裝置的 Google 授權</button>`;
     _allCoupons = r.coupons || [];
     document.getElementById('filterBar').classList.toggle('hidden', !_allCoupons.length);
     if (!_allCoupons.length) root.innerHTML = renderEmpty('您目前沒有兌換券', '完成問卷後，兌換券會顯示在這裡。');

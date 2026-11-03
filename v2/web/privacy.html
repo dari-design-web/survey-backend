@@ -33,11 +33,11 @@
 
   <section class="bg-white border border-slate-200 rounded-xl p-6 mb-4">
     <h2 class="text-lg font-bold text-brand-700 mb-2">二、蒐集項目</h2>
-    <p class="text-sm leading-relaxed mb-2">一般問卷不需提供姓名、地址、Email 或身分證等資料，系統以您的 Google 帳號登入辨識同一人（未啟用 Google 登入時，改以裝置識別碼辨識同一裝置）。若問卷設有電話題，或您在意見欄自行填寫個人資料，該內容會一併保存。實際蒐集內容如下：</p>
+    <p class="text-sm leading-relaxed mb-2">一般問卷不需提供姓名、地址、Email 或身分證等資料，系統以您授權的 Google 帳號辨識同一帳號（未啟用 Google 授權時，改以裝置識別碼辨識同一裝置）。若問卷設有電話題，或您在意見欄自行填寫個人資料，該內容會一併保存。實際蒐集內容如下：</p>
     <ul class="list-disc list-inside text-sm leading-relaxed space-y-1">
       <li><strong>問卷填答內容</strong>（您主動填寫的選項與意見）</li>
       <li><strong>填寫時間</strong></li>
-      <li><strong>Google 帳號識別碼</strong> — 您以 Google 登入時，系統只保存由 Google 帳號編號經單向雜湊後的代碼，用於「每個帳號每月限領一次」的判斷；<strong>不保存</strong>您的姓名、Email、大頭貼或 Google 密碼，也無法由代碼反查您的帳號</li>
+      <li><strong>Google 帳號識別碼</strong> — 您以 Google 帳號授權時，系統只保存由 Google 帳號編號經單向雜湊後的代碼，用於「每個帳號每月限領一次」的判斷；<strong>不保存</strong>您的姓名、Email、大頭貼或 Google 密碼，也無法由代碼反查您的帳號</li>
       <li><strong>裝置識別碼（device_id）</strong> — 由您的瀏覽器隨機產生的亂數字串，儲存於您的瀏覽器中，用於識別「同一裝置是否已領過兌換券」。識別碼並非取自您的姓名或電話，但會與您的填答及兌換紀錄相連</li>
       <li><strong>兌換券資料</strong>：券號、贈品、取得與兌換期限、狀態（未兌換／已兌換／已逾期／已作廢）、核銷時間</li>
       <li><strong>系統紀錄</strong>：為贈品庫存對帳與防止重複兌換所需的核銷、庫存異動及管理操作紀錄</li>
@@ -51,7 +51,7 @@
     <h2 class="text-lg font-bold text-brand-700 mb-2">三、利用方式</h2>
     <ul class="list-disc list-inside text-sm leading-relaxed space-y-1">
       <li>填答資料以「整體統計」方式呈現，<strong>不對外公開個別填答內容</strong></li>
-      <li>不會將您的資料出售或提供他人作行銷使用</li><li>系統使用的外部服務：資料存放於 Google（試算表與 Apps Script）；網頁由 GitHub Pages 提供，該服務可能依其政策記錄連線 IP；Google 登入由 Google 驗證身分（Google 會知道您登入了本服務）；兌換券 QR Code 在您的手機上直接產生，不經過第三方</li>
+      <li>不會將您的資料出售或提供他人作行銷使用</li><li>系統使用的外部服務：資料存放於 Google（試算表與 Apps Script）；網頁由 GitHub Pages 提供，該服務可能依其政策記錄連線 IP；Google 授權由 Google 驗證身分（Google 會知道您授權了本服務）；兌換券 QR Code 在您的手機上直接產生，不經過第三方</li>
       <li>不會用於行銷、廣告或其他商業用途</li>
     </ul>
   </section>

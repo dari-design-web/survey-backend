@@ -17,7 +17,7 @@
     <header>
       <p class="eyebrow">服務體驗回饋</p>
       <h1 class="serif" style="margin-top:12px">您的感受，<br>是我們進步的起點。</h1>
-      <p class="muted" style="margin-top:16px">留下一點想法，讓下一次到訪更好。問卷採匿名填寫，不需登入。</p>
+      <p class="muted" style="margin-top:16px">留下一點想法，讓下一次到訪更好。<span id="authNote">問卷採匿名填寫。</span></p>
     </header>
     <div class="hero-art">
       <div><span class="hero-count" id="count">—</span><p class="muted">份進行中的問卷</p></div>
@@ -54,6 +54,9 @@
     list.innerHTML = notice('error', 'alert', '暫時無法連線，請稍後再試一次。<br><span class="muted">' + escHtml(e.message) + '</span>', 'alert');
   }
 })();
+</script>
+<script>
+publicConfig().then(c => { if (c && c.login_required) document.getElementById('authNote').textContent = '填寫前需以 Google 帳號授權確認身分（系統不保存您的姓名與 Email）。'; }).catch(() => {});
 </script>
 </body>
 </html>
